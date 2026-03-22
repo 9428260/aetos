@@ -12,6 +12,9 @@ from sqlalchemy.ext.asyncio import (
 from ..config import settings
 from .models import Base
 
+# Register dataset bundle tables on the same metadata.
+from . import models_dataset  # noqa: F401
+
 engine = create_async_engine(
     settings.database_url,
     echo=False,

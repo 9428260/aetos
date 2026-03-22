@@ -1,4 +1,5 @@
 .venv/
+.venv312/
 __pycache__/
 *.pyc
 *.pyo
@@ -6,6 +7,8 @@ __pycache__/
 dist/
 build/
 .env
+# Local dataset (too large for GitHub; see docs/md/real_data_dataset_design.md)
+tests/data/real.pkl
 .pytest_cache/
 .ruff_cache/
 *.log
