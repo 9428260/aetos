@@ -1,5 +1,7 @@
 """Scenario-based tests using generated test data."""
 
+import asyncio
+
 import pytest
 
 from aetos.agents.critic import MetaCritic
@@ -162,10 +164,9 @@ class TestCDA:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_workflow_all_scenarios(all_states: EnergyState):
+def test_workflow_all_scenarios(all_states: EnergyState):
     """모든 시나리오에서 워크플로우가 완료되고 전략이 선택되어야 함."""
-    result = await run_workflow(all_states)
+    result = asyncio.run(run_workflow(all_states))
 
     assert result["selected"] is not None, "전략이 선택되지 않음"
     assert isinstance(result["reward"], float)

@@ -1,10 +1,14 @@
 """Integration tests for the core agentic workflow (no DB required)."""
 
+import asyncio
+
 import pytest
 
 from aetos.agents.critic import MetaCritic
 from aetos.agents.optimizer import Optimizer
 from aetos.agents.strategy import StrategyGenerator
+from aetos.a2a import build_local_broker
+from aetos.execution.dispatch import Dispatcher
 from aetos.negotiation.cda import CDAMarket
 from aetos.reward import compute_reward, decompose_reward
 from aetos.state import Constraints, EnergyState
@@ -98,15 +102,32 @@ def test_reward_decompose_keys(sample_state):
         assert key in decomp
 
 
+def test_a2a_broker_routes_strategy_generation(sample_state):
+    broker = build_local_broker(
+        StrategyGenerator(),
+        Optimizer(iterations=2),
+        MetaCritic(),
+        Dispatcher(),
+    )
+    result = broker.send_task(
+        agent="strategy-generator",
+        skill="generate_strategies",
+        input={"energy_state": sample_state.model_dump()},
+    )
+    assert result.status == "completed"
+    assert result.artifacts[0].name == "strategies"
+    assert len(result.artifacts[0].data["strategies"]) >= 1
+
+
 # ---------------------------------------------------------------------------
 # Async integration test
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_full_workflow(sample_state):
-    result = await run_workflow(sample_state)
+def test_full_workflow(sample_state):
+    result = asyncio.run(run_workflow(sample_state))
 
     assert result["selected"] is not None
     assert result["reward"] != 0 or True  # just verify it ran
     assert len(result["messages"]) >= 4  # generate, optimize, auction, critique, dispatch
+    assert any(":a2a]" in msg for msg in result["messages"])

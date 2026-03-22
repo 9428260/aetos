@@ -31,7 +31,7 @@ from ..db.history import persist_workflow_run
 from ..db.models import Episode, KPI
 from ..db.session import AsyncSessionLocal, get_session, init_db
 from ..state import Constraints, EnergyState
-from ..workflow import run_workflow
+from ..workflow import get_agent_cards, run_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +194,11 @@ async def dashboard() -> FileResponse:
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@app.get("/a2a/agents")
+async def a2a_agents() -> list[dict]:
+    return get_agent_cards()
 
 
 @app.post("/run", response_model=RunResponse)
