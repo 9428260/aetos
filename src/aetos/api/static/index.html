@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AETOS Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #080d1a;
+  --card: #0f1829;
+  --card2: #162035;
+  --border: #1e2d4a;
+  --primary: #00d4aa;
+  --primary-dim: rgba(0,212,170,0.15);
+  --blue: #3b82f6;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --radius: 12px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+
+/* ── Header ── */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px; border-bottom: 1px solid var(--border);
+  background: var(--card); position: sticky; top: 0; z-index: 100;
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo h1 { font-size: 18px; font-weight: 700; letter-spacing: .5px; }
+.logo span { font-size: 22px; }
+.badge-live { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  background: var(--primary-dim); color: var(--primary); border: 1px solid var(--primary);
+  display: flex; align-items: center; gap: 5px; }
+.badge-live .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--primary);
+  animation: pulse 1.5s infinite; }
+.badge-live.running { background: rgba(245,158,11,.15); color: var(--amber); border-color: var(--amber); }
+.badge-live.running .dot { background: var(--amber); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+header .meta { color: var(--muted); font-size: 12px; }
+.btn-run {
+  padding: 9px 22px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px;
+  font-weight: 600; background: var(--primary); color: #000; transition: .2s;
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-run:hover { background: #00b899; transform: translateY(-1px); }
+.btn-run:disabled { background: var(--muted); cursor: not-allowed; transform: none; }
+
+/* ── Layout ── */
+.main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 24px; }
+.full { grid-column: 1 / -1; }
+
+/* ── Card ── */
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px;
+}
+.card-title {
+  font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+}
+.card-title .icon { font-size: 14px; }
+
+/* ── KPI Bar ── */
+.kpi-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.kpi-card {
+  background: var(--card2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px; position: relative; overflow: hidden;
+}
+.kpi-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--accent, var(--primary));
+}
+.kpi-card.blue { --accent: var(--blue); }
+.kpi-card.amber { --accent: var(--amber); }
+.kpi-card.red { --accent: var(--red); }
+.kpi-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.kpi-value { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* ── SOC gauge ── */
+.soc-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.soc-bar-wrap { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
+.soc-bar { height: 100%; border-radius: 5px; transition: width .6s ease; background: var(--primary); }
+.soc-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.soc-value { font-size: 15px; font-weight: 700; color: var(--primary); white-space: nowrap; }
+
+/* ── Workflow Trace ── */
+.workflow-steps { display: flex; flex-direction: column; gap: 8px; }
+.step {
+  border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+  background: var(--card2); opacity: 0; transform: translateX(12px);
+  transition: opacity .35s ease, transform .35s ease;
+}
+.step.visible { opacity: 1; transform: translateX(0); }
+.step.active { border-color: var(--primary); box-shadow: 0 0 12px var(--primary-dim); }
+.step-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.step-icon { font-size: 16px; width: 24px; text-align: center; }
+.step-name { font-weight: 700; font-size: 13px; flex: 1; }
+.step-badge {
+  padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 700;
+  background: var(--primary-dim); color: var(--primary); border: 1px solid var(--primary);
+}
+.step-badge.skipped { background: rgba(100,116,139,.15); color: var(--muted); border-color: var(--muted); }
+.step-duration { font-size: 11px; color: var(--muted); }
+.step-summary { font-size: 12px; color: var(--text); margin-bottom: 2px; }
+.step-detail { font-size: 11px; color: var(--muted); }
+.step-metrics { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+.metric { background: var(--bg); border-radius: 6px; padding: 4px 8px; font-size: 11px; }
+.metric .mk { color: var(--muted); }
+.metric .mv { color: var(--primary); font-weight: 600; margin-left: 4px; }
+
+/* ── Charts ── */
+.chart-wrap { position: relative; height: 200px; }
+.chart-wrap.tall { height: 260px; }
+.chart-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+.tab-btn {
+  padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); cursor: pointer; font-size: 11px;
+  transition: .15s;
+}
+.tab-btn.active { background: var(--primary-dim); color: var(--primary); border-color: var(--primary); }
+
+/* ── Strategy chart ── */
+.strategy-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Reward decomp ── */
+.decomp-list { display: flex; flex-direction: column; gap: 8px; }
+.decomp-item { display: flex; align-items: center; gap: 8px; }
+.decomp-label { font-size: 12px; width: 120px; flex-shrink: 0; color: var(--text); }
+.decomp-bar-wrap { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: visible; position: relative; }
+.decomp-bar { height: 100%; border-radius: 4px; transition: width .6s ease; min-width: 2px; }
+.decomp-bar.pos { background: var(--primary); }
+.decomp-bar.neg { background: var(--red); }
+.decomp-value { font-size: 12px; font-weight: 600; width: 60px; text-align: right; flex-shrink: 0; }
+.decomp-value.pos { color: var(--primary); }
+.decomp-value.neg { color: var(--red); }
+
+/* ── KPI Trend ── */
+.kpi-trend-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.trend-tabs { display: flex; gap: 4px; }
+
+/* ── Episode Table ── */
+.ep-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ep-table th { color: var(--muted); font-weight: 600; text-align: left; padding: 6px 8px;
+  border-bottom: 1px solid var(--border); font-size: 11px; }
+.ep-table td { padding: 6px 8px; border-bottom: 1px solid rgba(30,45,74,.5); }
+.ep-table tr:last-child td { border-bottom: none; }
+.ep-table tr:hover td { background: var(--card2); }
+.mode-badge { padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600;
+  background: var(--primary-dim); color: var(--primary); }
+.ep-scroll { max-height: 220px; overflow-y: auto; }
+.ep-scroll::-webkit-scrollbar { width: 4px; }
+.ep-scroll::-webkit-scrollbar-track { background: transparent; }
+.ep-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Misc ── */
+.empty-state { text-align: center; padding: 32px; color: var(--muted); font-size: 13px; }
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid transparent;
+  border-top-color: currentColor; border-radius: 50%; animation: spin .6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.section-gap { margin-bottom: 4px; }
+
+@media (max-width: 900px) {
+  .main { grid-template-columns: 1fr; }
+  .kpi-bar { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- ─────────────── Header ─────────────── -->
+<header>
+  <div class="logo">
+    <span>⚡</span>
+    <div>
+      <h1>AETOS</h1>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">Autonomous Agentic Energy Trading & Optimization</div>
+    </div>
+  </div>
+  <div id="statusBadge" class="badge-live">
+    <span class="dot"></span><span id="statusText">IDLE</span>
+  </div>
+  <div class="meta" id="lastRunMeta">아직 실행되지 않음</div>
+  <button class="btn-run" id="btnRun" onclick="runOptimization()">
+    <span>▶</span> RUN NOW
+  </button>
+</header>
+
+<!-- ─────────────── Main Grid ─────────────── -->
+<div class="main">
+
+  <!-- KPI Bar (full width) -->
+  <div class="full">
+    <div class="kpi-bar">
+      <div class="kpi-card">
+        <div class="kpi-label">💰 누적 비용 절감</div>
+        <div class="kpi-value" id="kpiCostSaving">—</div>
+        <div class="kpi-sub" id="kpiCostSavingSub">에피소드 합계</div>
+      </div>
+      <div class="kpi-card blue">
+        <div class="kpi-label">🔋 ESS 수익</div>
+        <div class="kpi-value" id="kpiEssProfit">—</div>
+        <div class="kpi-sub" id="kpiEssProfitSub">충방전 차익</div>
+      </div>
+      <div class="kpi-card amber">
+        <div class="kpi-label">☀️ Solar ROI</div>
+        <div class="kpi-value" id="kpiRoi">—</div>
+        <div class="kpi-sub" id="kpiRoiSub">태양광 수익</div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-label">📊 평균 Reward</div>
+        <div class="kpi-value" id="kpiAvgReward">—</div>
+        <div class="kpi-sub" id="kpiEpisodes">0 에피소드</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Left: Energy State ── -->
+  <div class="card">
+    <div class="card-title"><span class="icon">⚡</span>에너지 상태 (24h)</div>
+
+    <!-- SOC Gauge -->
+    <div class="soc-row">
+      <div class="soc-label">ESS SOC</div>
+      <div class="soc-bar-wrap">
+        <div class="soc-bar" id="socBar" style="width:50%"></div>
+      </div>
+      <div class="soc-value" id="socValue">50%</div>
+    </div>
+
+    <div class="chart-tabs">
+      <button class="tab-btn active" onclick="setEnergyTab('price', this)">가격</button>
+      <button class="tab-btn" onclick="setEnergyTab('load', this)">부하</button>
+      <button class="tab-btn" onclick="setEnergyTab('gen', this)">발전량</button>
+      <button class="tab-btn" onclick="setEnergyTab('all', this)">통합</button>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="energyChart"></canvas>
+    </div>
+  </div>
+
+  <!-- ── Right: Workflow Trace ── -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🤖</span>Agentic Workflow 실행 추적</div>
+    <div class="workflow-steps" id="workflowSteps">
+      <div class="empty-state">▶ RUN NOW 버튼을 눌러 에이전트를 실행하세요</div>
+    </div>
+  </div>
+
+  <!-- ── Left: Strategy Comparison ── -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📊</span>전략 비교 (Bid 값)</div>
+    <div id="strategyLegend" class="strategy-legend"></div>
+    <div class="chart-wrap">
+      <canvas id="strategyChart"></canvas>
+    </div>
+  </div>
+
+  <!-- ── Right: Reward Decomposition ── -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🎯</span>Reward 분해</div>
+    <div class="decomp-list" id="decompList">
+      <div class="empty-state">실행 후 보상 구성 요소가 표시됩니다</div>
+    </div>
+    <div style="margin-top:14px">
+      <div class="chart-wrap" style="height:130px">
+        <canvas id="decompChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── KPI Trends (full width) ── -->
+  <div class="card full">
+    <div class="kpi-trend-header">
+      <div class="card-title" style="margin-bottom:0"><span class="icon">📈</span>KPI 추이 (최근 에피소드)</div>
+      <div class="trend-tabs">
+        <button class="tab-btn active" onclick="setTrendMetric('reward', this)">Reward</button>
+        <button class="tab-btn" onclick="setTrendMetric('cost_saving', this)">비용절감</button>
+        <button class="tab-btn" onclick="setTrendMetric('ess_profit', this)">ESS수익</button>
+        <button class="tab-btn" onclick="setTrendMetric('roi', this)">Solar ROI</button>
+      </div>
+    </div>
+    <div style="height:16px"></div>
+    <div class="chart-wrap tall">
+      <canvas id="trendChart"></canvas>
+    </div>
+  </div>
+
+  <!-- ── Episode History ── -->
+  <div class="card full">
+    <div class="card-title"><span class="icon">📋</span>에피소드 이력</div>
+    <div class="ep-scroll">
+      <table class="ep-table">
+        <thead>
+          <tr>
+            <th>#</th><th>시각</th><th>모드</th>
+            <th>Reward</th><th>비용절감</th><th>ESS수익</th><th>Solar ROI</th>
+          </tr>
+        </thead>
+        <tbody id="episodeTableBody">
+          <tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">
+            에피소드 없음
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ─────────────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────────────
+let energyChart = null, strategyChart = null, decompChart = null, trendChart = null;
+let currentEnergyTab = 'price';
+let currentTrendMetric = 'reward';
+let lastEnergyState = null;
+let episodes = [];
+
+const MODE_COLORS = {
+  aggressive_discharge: '#ef4444',
+  solar_first:         '#f59e0b',
+  load_shifting:       '#3b82f6',
+  ess_charge:          '#8b5cf6',
+  market_arbitrage:    '#ec4899',
+  conservative:        '#64748b',
+};
+function modeColor(mode) { return MODE_COLORS[mode] || '#64748b'; }
+
+// ─────────────────────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────────────────────
+async function init() {
+  initEnergyChart([]);
+  initStrategyChart([]);
+  initDecompChart({});
+  initTrendChart([]);
+  await loadKPI();
+  await loadEpisodes();
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Run
+// ─────────────────────────────────────────────────────────────────────
+async function runOptimization() {
+  const btn = document.getElementById('btnRun');
+  const badge = document.getElementById('statusBadge');
+  const statusText = document.getElementById('statusText');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 실행 중...';
+  badge.classList.add('running');
+  statusText.textContent = 'RUNNING';
+
+  clearWorkflowSteps();
+
+  try {
+    const res = await fetch('/run', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({goal: 'optimize'}),
+    });
+    const data = await res.json();
+
+    // Update last run time
+    const ts = new Date(data.timestamp);
+    document.getElementById('lastRunMeta').textContent =
+      `최근 실행: ${ts.toLocaleTimeString('ko-KR')}  │  Reward: ${data.reward.toFixed(4)}`;
+
+    // Animate workflow
+    await animateWorkflowSteps(data.step_events);
+
+    // Update charts
+    if (data.energy_state) {
+      lastEnergyState = data.energy_state;
+      updateSOC(data.energy_state.ess_soc);
+      updateEnergyChart(data.energy_state);
+    }
+    if (data.all_strategies?.length) {
+      updateStrategyChart(data.all_strategies, data.selected_strategy);
+    }
+    if (data.reward_decomposition) {
+      updateDecomposition(data.reward_decomposition);
+    }
+
+    // Refresh KPI & episodes
+    await loadKPI();
+    await loadEpisodes();
+
+  } catch(e) {
+    console.error(e);
+    alert('실행 오류: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>▶</span> RUN NOW';
+    badge.classList.remove('running');
+    statusText.textContent = 'IDLE';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Workflow Trace Animation
+// ─────────────────────────────────────────────────────────────────────
+function clearWorkflowSteps() {
+  document.getElementById('workflowSteps').innerHTML = '';
+}
+
+async function animateWorkflowSteps(stepEvents) {
+  const container = document.getElementById('workflowSteps');
+  for (let i = 0; i < stepEvents.length; i++) {
+    await delay(220);
+    const ev = stepEvents[i];
+    const el = buildStepEl(ev, i);
+    container.appendChild(el);
+    await delay(30);
+    el.classList.add('visible');
+    if (i === stepEvents.length - 1) el.classList.add('active');
+  }
+}
+
+function buildStepEl(ev, idx) {
+  const div = document.createElement('div');
+  div.className = 'step';
+
+  const badgeClass = ev.status === 'done' ? '' : 'skipped';
+  const badgeText  = ev.status === 'done' ? '✓ 완료' : '건너뜀';
+
+  let metricsHtml = '';
+  if (ev.node === 'generate') {
+    metricsHtml = `<div class="step-metrics">
+      <div class="metric"><span class="mk">전략 수</span><span class="mv">${ev.n_strategies ?? '?'}개</span></div>
+    </div>`;
+  } else if (ev.node === 'optimize') {
+    const bids = (ev.strategies || []).map(s => s.bid);
+    const best = bids.length ? Math.max(...bids).toFixed(4) : '?';
+    metricsHtml = `<div class="step-metrics">
+      <div class="metric"><span class="mk">최고 bid</span><span class="mv">${best}</span></div>
+      <div class="metric"><span class="mk">개선됨</span><span class="mv">${ev.strategies?.length ?? '?'}개</span></div>
+    </div>`;
+  } else if (ev.node === 'auction') {
+    metricsHtml = `<div class="step-metrics">
+      <div class="metric"><span class="mk">청산가</span><span class="mv">${ev.clearing_price ?? '?'}</span></div>
+      <div class="metric"><span class="mk">낙찰</span><span class="mv">${ev.n_winners}/${ev.n_bids}</span></div>
+      <div class="metric"><span class="mk">최고 bid</span><span class="mv">${ev.best_bid ?? '?'}</span></div>
+    </div>`;
+  } else if (ev.node === 'critique') {
+    const decomp = ev.reward_decomposition || {};
+    metricsHtml = `<div class="step-metrics">
+      <div class="metric"><span class="mk">전략 모드</span><span class="mv">${ev.selected_mode ?? '?'}</span></div>
+      <div class="metric"><span class="mk">Reward</span><span class="mv">${(ev.reward ?? 0).toFixed(4)}</span></div>
+      <div class="metric"><span class="mk">필터 제거</span><span class="mv">${ev.n_filtered ?? 0}개</span></div>
+    </div>`;
+  } else if (ev.node === 'dispatch') {
+    if (ev.status === 'done') {
+      metricsHtml = `<div class="step-metrics">
+        <div class="metric"><span class="mk">ESS 충전</span><span class="mv">+${ev.ess_charge_kw?.toFixed(1) ?? 0} kW</span></div>
+        <div class="metric"><span class="mk">ESS 방전</span><span class="mv">−${ev.ess_discharge_kw?.toFixed(1) ?? 0} kW</span></div>
+        <div class="metric"><span class="mk">Market</span><span class="mv">${ev.market_quantity_kw?.toFixed(1) ?? 0} kW</span></div>
+        <div class="metric"><span class="mk">PV 감발</span><span class="mv">${ev.pv_curtailment_pct?.toFixed(0) ?? 0}%</span></div>
+      </div>`;
+    }
+  }
+
+  div.innerHTML = `
+    <div class="step-header">
+      <span class="step-icon">${ev.icon}</span>
+      <span class="step-name">⓪${['①','②','③','④','⑤'][idx] || idx+1} ${ev.label}</span>
+      <span class="step-badge ${badgeClass}">${badgeText}</span>
+      <span class="step-duration">${ev.duration_ms}ms</span>
+    </div>
+    <div class="step-summary">${ev.summary}</div>
+    <div class="step-detail">${ev.detail}</div>
+    ${metricsHtml}
+  `;
+  // Fix the circled number (remove the extra ⓪)
+  div.querySelector('.step-name').textContent =
+    `${'①②③④⑤'[idx] || (idx+1)} ${ev.label}`;
+  return div;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// SOC
+// ─────────────────────────────────────────────────────────────────────
+function updateSOC(soc) {
+  const pct = Math.round(soc * 100);
+  document.getElementById('socBar').style.width = pct + '%';
+  document.getElementById('socValue').textContent = pct + '%';
+  const bar = document.getElementById('socBar');
+  bar.style.background = pct < 20 ? 'var(--red)' : pct < 40 ? 'var(--amber)' : 'var(--primary)';
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Energy State Chart
+// ─────────────────────────────────────────────────────────────────────
+const hours = Array.from({length:24}, (_, i) => `${i}:00`);
+
+function chartDefaults(label, data, color) {
+  return {
+    label, data,
+    borderColor: color, backgroundColor: color + '22',
+    fill: true, tension: 0.4, pointRadius: 0, pointHoverRadius: 4,
+    borderWidth: 2,
+  };
+}
+
+function initEnergyChart(state) {
+  const ctx = document.getElementById('energyChart').getContext('2d');
+  energyChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: hours, datasets: [] },
+    options: energyChartOptions(),
+  });
+}
+
+function energyChartOptions(yLabel='', yLabel2='') {
+  return {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
+    plugins: { legend: { display: true, labels: { color: '#94a3b8', boxWidth: 12 } },
+               tooltip: { mode: 'index', intersect: false } },
+    scales: {
+      x: { grid: { color: '#1e2d4a' }, ticks: { color: '#64748b', maxTicksLimit: 8 } },
+      y: { grid: { color: '#1e2d4a' }, ticks: { color: '#64748b' } },
+    },
+  };
+}
+
+function updateEnergyChart(state) {
+  if (!state) return;
+  const tab = currentEnergyTab;
+  let datasets = [];
+  if (tab === 'price' || tab === 'all') {
+    datasets.push(chartDefaults('가격 ($/kWh)', state.price, '#00d4aa'));
+  }
+  if (tab === 'load' || tab === 'all') {
+    datasets.push(chartDefaults('부하 (kW)', state.load, '#3b82f6'));
+  }
+  if (tab === 'gen' || tab === 'all') {
+    datasets.push(chartDefaults('발전량 (kW)', state.generation, '#f59e0b'));
+  }
+  energyChart.data.datasets = datasets;
+  energyChart.update();
+}
+
+function setEnergyTab(tab, btn) {
+  currentEnergyTab = tab;
+  document.querySelectorAll('.chart-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (lastEnergyState) updateEnergyChart(lastEnergyState);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Strategy Comparison Chart
+// ─────────────────────────────────────────────────────────────────────
+function initStrategyChart() {
+  const ctx = document.getElementById('strategyChart').getContext('2d');
+  strategyChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: [], datasets: [] },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      animation: { duration: 600 },
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => ` bid: ${ctx.raw.toFixed(4)}` }
+      }},
+      scales: {
+        x: { grid: { color: '#1e2d4a' }, ticks: { color: '#64748b' } },
+        y: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } },
+      },
+    },
+  });
+}
+
+function updateStrategyChart(strategies, selected) {
+  const sorted = [...strategies].sort((a, b) => b.bid - a.bid);
+  const selectedId = selected?.id;
+
+  const labels = sorted.map(s => s.mode.replace(/_/g,' '));
+  const bids   = sorted.map(s => s.bid);
+  const colors = sorted.map(s =>
+    s.id === selectedId ? '#00d4aa' :
+    modeColor(s.mode) + 'aa'
+  );
+  const borders = sorted.map(s =>
+    s.id === selectedId ? '#00d4aa' : modeColor(s.mode)
+  );
+
+  strategyChart.data.labels = labels;
+  strategyChart.data.datasets = [{
+    data: bids, backgroundColor: colors, borderColor: borders,
+    borderWidth: 2, borderRadius: 5,
+  }];
+  strategyChart.update();
+
+  // Legend
+  const legend = document.getElementById('strategyLegend');
+  legend.innerHTML = sorted.map((s,i) => `
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${modeColor(s.mode)}"></div>
+      <span>${s.mode.replace(/_/g,' ')}${s.id===selectedId?' ★':''}</span>
+    </div>`).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Reward Decomposition
+// ─────────────────────────────────────────────────────────────────────
+const DECOMP_ITEMS = [
+  { key: 'cost_saving',      label: '💰 비용 절감',   pos: true },
+  { key: 'solar_roi',        label: '☀️ Solar ROI',   pos: true },
+  { key: 'ess_profit',       label: '🔋 ESS 수익',    pos: true },
+  { key: 'degradation_cost', label: '⚙️ 열화 비용',   pos: false },
+  { key: 'risk_penalty',     label: '⚠️ 리스크 페널티', pos: false },
+];
+
+function initDecompChart() {
+  const ctx = document.getElementById('decompChart').getContext('2d');
+  decompChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw.toFixed(4)}` } } },
+      scales: {
+        x: { stacked: false, grid: { color: '#1e2d4a' }, ticks: { color: '#64748b', font:{size:10} } },
+        y: { grid: { color: '#1e2d4a' }, ticks: { color: '#64748b' } },
+      },
+    },
+  });
+}
+
+function updateDecomposition(decomp) {
+  if (!decomp || Object.keys(decomp).length === 0) return;
+
+  const maxAbs = Math.max(...DECOMP_ITEMS.map(d => Math.abs(decomp[d.key] || 0)), 0.001);
+  const list = document.getElementById('decompList');
+  list.innerHTML = DECOMP_ITEMS.map(item => {
+    const val = decomp[item.key] || 0;
+    const pct = Math.abs(val) / maxAbs * 100;
+    const sign = val >= 0 ? '+' : '';
+    const cls = item.pos ? 'pos' : 'neg';
+    return `<div class="decomp-item">
+      <div class="decomp-label">${item.label}</div>
+      <div class="decomp-bar-wrap">
+        <div class="decomp-bar ${cls}" style="width:${pct}%"></div>
+      </div>
+      <div class="decomp-value ${cls}">${sign}${val.toFixed(4)}</div>
+    </div>`;
+  }).join('');
+
+  // Update bar chart
+  decompChart.data.labels = DECOMP_ITEMS.map(d => d.label.replace(/^.{2}/,''));
+  decompChart.data.datasets = [{
+    data: DECOMP_ITEMS.map(d => decomp[d.key] || 0),
+    backgroundColor: DECOMP_ITEMS.map(d =>
+      d.pos ? '#00d4aa55' : '#ef444455'),
+    borderColor: DECOMP_ITEMS.map(d => d.pos ? '#00d4aa' : '#ef4444'),
+    borderWidth: 2, borderRadius: 4,
+  }];
+  decompChart.update();
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// KPI Trend Chart
+// ─────────────────────────────────────────────────────────────────────
+function initTrendChart() {
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 600 },
+      plugins: {
+        legend: { display: false },
+        tooltip: { mode: 'index', intersect: false },
+      },
+      scales: {
+        x: { grid: { color: '#1e2d4a' }, ticks: { color: '#64748b', maxTicksLimit: 10, font:{size:10} } },
+        y: { grid: { color: '#1e2d4a' }, ticks: { color: '#64748b' } },
+      },
+    },
+  });
+}
+
+function setTrendMetric(metric, btn) {
+  currentTrendMetric = metric;
+  document.querySelectorAll('.trend-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateTrendChart();
+}
+
+function updateTrendChart() {
+  if (!episodes.length) return;
+
+  const reversed = [...episodes].reverse(); // oldest first
+  const labels = reversed.map((_,i) => `#${i+1}`);
+  const metricMap = {
+    reward: { key: 'reward', label: 'Reward', color: '#00d4aa' },
+    cost_saving: { key: 'cost_saving', label: '비용 절감', color: '#3b82f6' },
+    ess_profit:  { key: 'ess_profit',  label: 'ESS 수익',  color: '#8b5cf6' },
+    roi:         { key: 'roi',         label: 'Solar ROI', color: '#f59e0b' },
+  };
+  const m = metricMap[currentTrendMetric];
+  const data = reversed.map(e => e[m.key] ?? 0);
+
+  trendChart.data.labels = labels;
+  trendChart.data.datasets = [{
+    label: m.label, data,
+    borderColor: m.color, backgroundColor: m.color + '22',
+    fill: true, tension: 0.3, pointRadius: data.length > 30 ? 0 : 3,
+    pointHoverRadius: 5, borderWidth: 2,
+  }];
+  trendChart.update();
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Episode Table
+// ─────────────────────────────────────────────────────────────────────
+function updateEpisodeTable() {
+  const tbody = document.getElementById('episodeTableBody');
+  if (!episodes.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">에피소드 없음</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = episodes.slice(0, 50).map((ep, i) => {
+    const ts = new Date(ep.timestamp).toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const mode = ep.mode || '?';
+    return `<tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td style="color:var(--muted);font-size:11px">${ts}</td>
+      <td><span class="mode-badge" style="background:${modeColor(mode)}22;color:${modeColor(mode)};border-color:${modeColor(mode)}">${mode.replace(/_/g,' ')}</span></td>
+      <td style="color:var(--primary);font-weight:600">${(ep.reward??0).toFixed(4)}</td>
+      <td>${(ep.cost_saving??0).toFixed(4)}</td>
+      <td>${(ep.ess_profit??0).toFixed(4)}</td>
+      <td>${(ep.roi??0).toFixed(4)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// API Calls
+// ─────────────────────────────────────────────────────────────────────
+async function loadKPI() {
+  try {
+    const data = await fetch('/kpi').then(r => r.json());
+    document.getElementById('kpiCostSaving').textContent  = fmt$(data.cost_saving);
+    document.getElementById('kpiEssProfit').textContent   = fmt$(data.ess_profit);
+    document.getElementById('kpiRoi').textContent         = fmt$(data.roi);
+    document.getElementById('kpiAvgReward').textContent   = (data.avg_reward ?? 0).toFixed(4);
+    document.getElementById('kpiEpisodes').textContent    = `${data.n_episodes} 에피소드`;
+    document.getElementById('kpiCostSavingSub').textContent = `누적 ${fmt$(data.cost_saving)}`;
+  } catch(e) { console.warn('KPI load failed', e); }
+}
+
+async function loadEpisodes() {
+  try {
+    episodes = await fetch('/episodes?limit=100').then(r => r.json());
+    updateEpisodeTable();
+    updateTrendChart();
+  } catch(e) { console.warn('Episodes load failed', e); }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Utilities
+// ─────────────────────────────────────────────────────────────────────
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+function fmt$(v) {
+  const n = parseFloat(v) || 0;
+  return '$' + n.toFixed(2);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Boot
+// ─────────────────────────────────────────────────────────────────────
+init();
+
+// Auto-refresh KPI every 30s
+setInterval(async () => {
+  await loadKPI();
+  await loadEpisodes();
+}, 30_000);
+</script>
+</body>
+</html>

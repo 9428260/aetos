@@ -1,0 +1,33 @@
+{
+  "aggressive_discharge": {
+    "discharge": 45.0,
+    "market_qty": 40.0,
+    "market_price": 0.18,
+    "bid": 2.5
+  },
+  "solar_first": {
+    "charge": 20.0,
+    "bid": 1.2
+  },
+  "load_shifting": {
+    "shift_kw": 8.0,
+    "shift_intervals": 2,
+    "bid": 0.8
+  },
+  "ess_charging": {
+    "charge": 30.0,
+    "bid": 0.5
+  },
+  "conservative": {
+    "bid": 0.1
+  },
+  "soc_violation": {
+    "discharge": 95.0,
+    "bid": -5.0
+  },
+  "export_violation": {
+    "discharge": 80.0,
+    "market_qty": 80.0,
+    "bid": 3.0
+  }
+}
