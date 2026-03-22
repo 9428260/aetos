@@ -208,6 +208,134 @@ header .meta { color: var(--muted); font-size: 12px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .section-gap { margin-bottom: 4px; }
 
+/* ── History View ── */
+.view-history { display: none; padding: 20px 24px; }
+.view-history.active { display: block; }
+
+.hist-toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 14px 16px; background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 16px;
+}
+.hist-toolbar-title { font-size: 13px; font-weight: 700; color: var(--text); margin-right: 6px; white-space: nowrap; }
+.hist-input {
+  padding: 6px 10px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); font-size: 12px; outline: none;
+  transition: border-color .2s;
+}
+.hist-input:focus { border-color: var(--primary); }
+.hist-select {
+  padding: 6px 10px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); font-size: 12px; cursor: pointer; outline: none;
+}
+.hist-btn {
+  padding: 6px 14px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--card2); color: var(--text); font-size: 12px; cursor: pointer; transition: .15s;
+}
+.hist-btn:hover { border-color: var(--primary); color: var(--primary); }
+.hist-btn.primary { background: var(--primary); color: #000; border-color: var(--primary); }
+.hist-btn.primary:hover { background: #00b899; }
+.hist-spacer { flex: 1; }
+
+.hist-table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.hist-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.hist-table th {
+  color: var(--muted); font-weight: 600; text-align: left; padding: 10px 12px;
+  border-bottom: 1px solid var(--border); font-size: 11px; background: var(--card2);
+  position: sticky; top: 0; z-index: 1;
+  cursor: pointer; user-select: none;
+}
+.hist-table th:hover { color: var(--text); }
+.hist-table th .sort-icon { margin-left: 4px; opacity: 0.5; }
+.hist-table th.sort-asc .sort-icon::after { content: '↑'; }
+.hist-table th.sort-desc .sort-icon::after { content: '↓'; }
+.hist-table td { padding: 9px 12px; border-bottom: 1px solid rgba(30,45,74,.4); }
+.hist-table tr:last-child td { border-bottom: none; }
+.hist-table tbody tr { cursor: pointer; transition: background .15s; }
+.hist-table tbody tr:hover td { background: var(--card2); }
+.hist-table .ep-id { font-family: monospace; font-size: 10px; color: var(--muted); }
+.source-badge {
+  padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600;
+  background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid var(--blue);
+}
+.source-badge.loop { background: rgba(139,92,246,0.15); color: #8b5cf6; border-color: #8b5cf6; }
+
+.hist-pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--muted);
+}
+.hist-page-btns { display: flex; gap: 6px; }
+
+/* ── Episode Detail Modal ── */
+.ep-detail-overlay {
+  position: fixed; inset: 0; z-index: 1100;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(8,13,26,0.92); backdrop-filter: blur(8px);
+}
+.ep-detail-panel {
+  background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+  width: min(900px, 96vw); max-height: 92vh; overflow-y: auto;
+  padding: 22px 24px; display: flex; flex-direction: column; gap: 16px;
+  box-shadow: 0 0 60px rgba(0,212,170,0.12);
+  scrollbar-width: thin;
+}
+.ep-detail-panel::-webkit-scrollbar { width: 4px; }
+.ep-detail-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.ep-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ep-detail-title { font-size: 16px; font-weight: 700; }
+.ep-detail-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.ep-detail-close {
+  padding: 6px 16px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--card2); color: var(--text); font-size: 13px; cursor: pointer; transition: .15s;
+  white-space: nowrap; flex-shrink: 0;
+}
+.ep-detail-close:hover { border-color: var(--primary); color: var(--primary); }
+
+.ep-detail-kpi { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.ep-kpi-item { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.ep-kpi-label { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+.ep-kpi-value { font-size: 20px; font-weight: 700; color: var(--text); }
+.ep-kpi-item.green .ep-kpi-value { color: var(--primary); }
+.ep-kpi-item.blue .ep-kpi-value { color: var(--blue); }
+.ep-kpi-item.amber .ep-kpi-value { color: var(--amber); }
+
+.ep-detail-section { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.ep-detail-section-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+}
+.ep-action-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ep-action-item { background: var(--bg); border-radius: 7px; padding: 8px 10px; }
+.ep-action-label { font-size: 10px; color: var(--muted); }
+.ep-action-value { font-size: 14px; font-weight: 700; color: var(--primary); margin-top: 2px; }
+.ep-action-item.mode { grid-column: 1 / -1; }
+.ep-action-item.mode .ep-action-value { font-size: 16px; color: var(--amber); }
+
+.ep-messages { display: flex; flex-direction: column; gap: 6px; }
+.ep-message {
+  background: var(--bg); border-left: 3px solid var(--border);
+  border-radius: 0 6px 6px 0; padding: 8px 10px;
+  font-size: 12px; color: var(--text); line-height: 1.5;
+}
+.ep-message.agent { border-left-color: var(--primary); }
+.ep-msg-label { font-size: 10px; color: var(--muted); margin-bottom: 3px; font-weight: 600; }
+
+.ep-soc-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.ep-state-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ep-state-item { background: var(--bg); border-radius: 7px; padding: 8px 10px; }
+.ep-state-label { font-size: 10px; color: var(--muted); }
+.ep-state-value { font-size: 13px; font-weight: 600; color: var(--text); margin-top: 2px; }
+
+@media (max-width: 640px) {
+  .ep-detail-kpi { grid-template-columns: repeat(2, 1fr); }
+  .ep-action-grid { grid-template-columns: 1fr 1fr; }
+  .ep-action-item.mode { grid-column: 1 / -1; }
+  .ep-state-grid { grid-template-columns: 1fr 1fr; }
+  .hist-toolbar { flex-direction: column; align-items: stretch; }
+}
+
 @media (max-width: 900px) {
   .app-shell { grid-template-columns: 1fr; }
   .lnb {
@@ -400,10 +528,10 @@ header .meta { color: var(--muted); font-size: 12px; }
     <div class="lnb-group">
       <div class="lnb-title">Navigation</div>
       <nav class="lnb-nav">
-        <a class="lnb-link" href="#overview"><span class="icon">◈</span><span>Overview</span></a>
+        <a class="lnb-link" id="navDashboard" href="#overview" onclick="showDashboard(event)"><span class="icon">◈</span><span>Overview</span></a>
         <a class="lnb-link" href="#workflow"><span class="icon">↺</span><span>Workflow</span></a>
         <a class="lnb-link" href="#strategy"><span class="icon">▣</span><span>Strategy</span></a>
-        <a class="lnb-link" href="#history"><span class="icon">☰</span><span>Episodes</span></a>
+        <a class="lnb-link" id="navHistory" href="#" onclick="showHistory(event)"><span class="icon">☰</span><span>이력 조회</span></a>
       </nav>
     </div>
 
@@ -553,6 +681,66 @@ header .meta { color: var(--muted); font-size: 12px; }
   </div>
 
 </div><!-- /main -->
+
+<!-- ─────────────── History View ─────────────── -->
+<div class="view-history" id="viewHistory">
+
+  <!-- Toolbar -->
+  <div class="hist-toolbar">
+    <span class="hist-toolbar-title">📋 이력 조회</span>
+    <input class="hist-input" id="histSearch" type="text" placeholder="에피소드 ID 검색..." style="width:180px">
+    <select class="hist-select" id="histSourceFilter">
+      <option value="">전체 소스</option>
+      <option value="api">API</option>
+      <option value="loop">Loop</option>
+    </select>
+    <select class="hist-select" id="histModeFilter">
+      <option value="">전체 모드</option>
+      <option value="aggressive_discharge">공격적 방전</option>
+      <option value="solar_first">태양광 우선</option>
+      <option value="load_shifting">부하 이동</option>
+      <option value="ess_charge">ESS 충전</option>
+      <option value="market_arbitrage">시장 차익</option>
+      <option value="conservative">보수적 운영</option>
+    </select>
+    <input class="hist-input" id="histDateFrom" type="date" title="시작일">
+    <input class="hist-input" id="histDateTo" type="date" title="종료일">
+    <div class="hist-spacer"></div>
+    <button class="hist-btn" onclick="resetHistoryFilters()">초기화</button>
+    <button class="hist-btn primary" onclick="applyHistoryFilters()">🔍 조회</button>
+  </div>
+
+  <!-- Table -->
+  <div class="hist-table-wrap">
+    <table class="hist-table">
+      <thead>
+        <tr>
+          <th onclick="sortHistory('idx')">#<span class="sort-icon"></span></th>
+          <th onclick="sortHistory('timestamp')">시각<span class="sort-icon"></span></th>
+          <th>소스</th>
+          <th onclick="sortHistory('mode')">모드<span class="sort-icon"></span></th>
+          <th onclick="sortHistory('reward')">Reward<span class="sort-icon"></span></th>
+          <th onclick="sortHistory('cost_saving')">비용 절감<span class="sort-icon"></span></th>
+          <th onclick="sortHistory('ess_profit')">ESS 수익<span class="sort-icon"></span></th>
+          <th onclick="sortHistory('roi')">Solar ROI<span class="sort-icon"></span></th>
+          <th>상세</th>
+        </tr>
+      </thead>
+      <tbody id="histTableBody">
+        <tr><td colspan="9" class="empty-state">조회 버튼을 눌러 이력을 불러오세요</td></tr>
+      </tbody>
+    </table>
+    <div class="hist-pagination">
+      <span id="histPaginationInfo">— 건</span>
+      <div class="hist-page-btns">
+        <button class="hist-btn" id="histPrevBtn" onclick="histChangePage(-1)" disabled>← 이전</button>
+        <span id="histPageLabel" style="padding:0 8px;line-height:28px">1 / 1</span>
+        <button class="hist-btn" id="histNextBtn" onclick="histChangePage(1)" disabled>다음 →</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /view-history -->
 </div><!-- /content -->
 </div><!-- /app-shell -->
 
@@ -646,6 +834,111 @@ header .meta { color: var(--muted); font-size: 12px; }
         </div>
       </div>
       <button class="ao-close-btn" onclick="closeAgentOverlay()">대시보드 확인 →</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ─────────────── Episode Detail Modal ─────────────── -->
+<div id="epDetailOverlay" class="ep-detail-overlay" style="display:none">
+  <div class="ep-detail-panel">
+
+    <div class="ep-detail-header">
+      <div>
+        <div class="ep-detail-title" id="epDetailTitle">에피소드 상세</div>
+        <div class="ep-detail-meta" id="epDetailMeta"></div>
+      </div>
+      <button class="ep-detail-close" onclick="closeEpisodeDetail()">✕ 닫기</button>
+    </div>
+
+    <!-- KPI Summary -->
+    <div class="ep-detail-kpi">
+      <div class="ep-kpi-item green">
+        <div class="ep-kpi-label">📊 Reward</div>
+        <div class="ep-kpi-value" id="epKpiReward">—</div>
+      </div>
+      <div class="ep-kpi-item">
+        <div class="ep-kpi-label">💰 비용 절감</div>
+        <div class="ep-kpi-value" id="epKpiCost">—</div>
+      </div>
+      <div class="ep-kpi-item blue">
+        <div class="ep-kpi-label">🔋 ESS 수익</div>
+        <div class="ep-kpi-value" id="epKpiEss">—</div>
+      </div>
+      <div class="ep-kpi-item amber">
+        <div class="ep-kpi-label">☀️ Solar ROI</div>
+        <div class="ep-kpi-value" id="epKpiRoi">—</div>
+      </div>
+    </div>
+
+    <!-- Energy State -->
+    <div class="ep-detail-section">
+      <div class="ep-detail-section-title">⚡ 에너지 상태</div>
+      <div class="ep-soc-row">
+        <span style="font-size:12px;color:var(--muted);white-space:nowrap">ESS SOC</span>
+        <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+          <div id="epSocBar" style="height:100%;border-radius:4px;background:var(--primary);transition:width .5s;width:50%"></div>
+        </div>
+        <span id="epSocValue" style="font-size:13px;font-weight:700;color:var(--primary);white-space:nowrap">50%</span>
+      </div>
+      <div class="ep-state-grid">
+        <div class="ep-state-item">
+          <div class="ep-state-label">현재 가격 (첫 시간)</div>
+          <div class="ep-state-value" id="epStatePrice">—</div>
+        </div>
+        <div class="ep-state-item">
+          <div class="ep-state-label">부하 (첫 시간)</div>
+          <div class="ep-state-value" id="epStateLoad">—</div>
+        </div>
+        <div class="ep-state-item">
+          <div class="ep-state-label">발전량 (첫 시간)</div>
+          <div class="ep-state-value" id="epStateGen">—</div>
+        </div>
+        <div class="ep-state-item">
+          <div class="ep-state-label">최대 전력 가격</div>
+          <div class="ep-state-value" id="epStatePriceMax">—</div>
+        </div>
+        <div class="ep-state-item">
+          <div class="ep-state-label">최대 부하</div>
+          <div class="ep-state-value" id="epStateLoadMax">—</div>
+        </div>
+        <div class="ep-state-item">
+          <div class="ep-state-label">최대 발전량</div>
+          <div class="ep-state-value" id="epStateGenMax">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Selected Action -->
+    <div class="ep-detail-section">
+      <div class="ep-detail-section-title">🎯 선택된 전략 (Action)</div>
+      <div class="ep-action-grid" id="epActionGrid">
+        <div class="empty-state">액션 정보 없음</div>
+      </div>
+    </div>
+
+    <!-- Workflow Trace -->
+    <div class="ep-detail-section">
+      <div class="ep-detail-section-title">🤖 워크플로우 실행 이력</div>
+      <div class="workflow-steps" id="epWorkflowSteps">
+        <div class="empty-state">워크플로우 이력 없음</div>
+      </div>
+    </div>
+
+    <!-- Agent Messages -->
+    <div class="ep-detail-section" id="epMessagesSection">
+      <div class="ep-detail-section-title">💬 에이전트 메시지</div>
+      <div class="ep-messages" id="epMessages">
+        <div class="empty-state">메시지 없음</div>
+      </div>
+    </div>
+
+    <!-- Reward Decomposition -->
+    <div class="ep-detail-section">
+      <div class="ep-detail-section-title">🎯 Reward 분해</div>
+      <div class="decomp-list" id="epDecompList">
+        <div class="empty-state">보상 분해 정보 없음</div>
+      </div>
     </div>
 
   </div>
@@ -1462,6 +1755,318 @@ async function animateAgentRun(data) {
   const footer = document.getElementById('aoFooter');
   footer.style.display = 'flex';
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// History View
+// ─────────────────────────────────────────────────────────────────────
+let _histAllEpisodes = [];   // raw list from API
+let _histFiltered    = [];   // after client-side filter
+let _histSortKey     = 'timestamp';
+let _histSortAsc     = false;
+let _histPage        = 1;
+const HIST_PAGE_SIZE = 20;
+
+function showDashboard(e) {
+  if (e) e.preventDefault();
+  document.getElementById('viewHistory').classList.remove('active');
+  document.querySelector('.main').style.display = '';
+  document.getElementById('navHistory').style.fontWeight = '';
+  document.getElementById('navDashboard').style.fontWeight = '700';
+}
+
+async function showHistory(e) {
+  if (e) e.preventDefault();
+  document.querySelector('.main').style.display = 'none';
+  document.getElementById('viewHistory').classList.add('active');
+  document.getElementById('navDashboard').style.fontWeight = '';
+  document.getElementById('navHistory').style.fontWeight = '700';
+  await loadHistoryEpisodes();
+}
+
+async function loadHistoryEpisodes() {
+  try {
+    _histAllEpisodes = await fetch('/episodes?limit=200').then(r => r.json());
+  } catch(e) {
+    _histAllEpisodes = episodes.slice(); // fallback to dashboard data
+  }
+  applyHistoryFilters();
+}
+
+function applyHistoryFilters() {
+  const search = document.getElementById('histSearch').value.trim().toLowerCase();
+  const source = document.getElementById('histSourceFilter').value;
+  const mode   = document.getElementById('histModeFilter').value;
+  const from   = document.getElementById('histDateFrom').value;
+  const to     = document.getElementById('histDateTo').value;
+
+  _histFiltered = _histAllEpisodes.filter(ep => {
+    if (search && !ep.id.toLowerCase().includes(search)) return false;
+    if (source && ep.source !== source) return false;
+    if (mode && ep.mode !== mode) return false;
+    const ts = ep.timestamp;
+    if (from && ts < from) return false;
+    if (to   && ts > to + 'T23:59:59') return false;
+    return true;
+  });
+
+  _histPage = 1;
+  sortHistoryData();
+  renderHistoryTable();
+}
+
+function resetHistoryFilters() {
+  document.getElementById('histSearch').value = '';
+  document.getElementById('histSourceFilter').value = '';
+  document.getElementById('histModeFilter').value = '';
+  document.getElementById('histDateFrom').value = '';
+  document.getElementById('histDateTo').value = '';
+  applyHistoryFilters();
+}
+
+function sortHistory(key) {
+  const ths = document.querySelectorAll('.hist-table th');
+  ths.forEach(th => { th.classList.remove('sort-asc','sort-desc'); });
+
+  if (_histSortKey === key) {
+    _histSortAsc = !_histSortAsc;
+  } else {
+    _histSortKey = key;
+    _histSortAsc = key === 'idx';
+  }
+  sortHistoryData();
+  renderHistoryTable();
+}
+
+function sortHistoryData() {
+  const key = _histSortKey;
+  const dir = _histSortAsc ? 1 : -1;
+  _histFiltered.sort((a, b) => {
+    if (key === 'idx') return dir; // original order
+    const av = a[key] ?? '';
+    const bv = b[key] ?? '';
+    if (typeof av === 'number') return (av - bv) * dir;
+    return String(av).localeCompare(String(bv)) * dir;
+  });
+}
+
+function renderHistoryTable() {
+  const total = _histFiltered.length;
+  const pages = Math.max(1, Math.ceil(total / HIST_PAGE_SIZE));
+  _histPage = Math.min(_histPage, pages);
+  const start = (_histPage - 1) * HIST_PAGE_SIZE;
+  const slice = _histFiltered.slice(start, start + HIST_PAGE_SIZE);
+
+  const tbody = document.getElementById('histTableBody');
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state">조회된 에피소드가 없습니다</td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map((ep, i) => {
+      const idx = start + i + 1;
+      const ts = new Date(ep.timestamp).toLocaleString('ko-KR', {
+        year:'2-digit', month:'2-digit', day:'2-digit',
+        hour:'2-digit', minute:'2-digit', second:'2-digit'
+      });
+      const mode = ep.mode || '?';
+      const srcClass = ep.source === 'loop' ? 'loop' : '';
+      return `<tr onclick="openEpisodeDetail('${ep.id}')">
+        <td style="color:var(--muted)">${idx}</td>
+        <td style="font-size:11px;color:var(--muted)">${ts}</td>
+        <td><span class="source-badge ${srcClass}">${ep.source || 'api'}</span></td>
+        <td><span class="mode-badge" style="background:${modeColor(mode)}22;color:${modeColor(mode)};border-color:${modeColor(mode)}">${modeEmoji(mode)} ${mode.replace(/_/g,' ')}</span></td>
+        <td style="color:var(--primary);font-weight:600">${(ep.reward??0).toFixed(4)}</td>
+        <td>${fmt$(ep.cost_saving)}</td>
+        <td>${fmt$(ep.ess_profit)}</td>
+        <td>${fmt$(ep.roi)}</td>
+        <td><button class="hist-btn" onclick="event.stopPropagation();openEpisodeDetail('${ep.id}')">상세 →</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('histPaginationInfo').textContent =
+    `총 ${total}건 (${start+1}–${Math.min(start+HIST_PAGE_SIZE, total)})`;
+  document.getElementById('histPageLabel').textContent = `${_histPage} / ${pages}`;
+  document.getElementById('histPrevBtn').disabled = _histPage <= 1;
+  document.getElementById('histNextBtn').disabled = _histPage >= pages;
+}
+
+function histChangePage(delta) {
+  _histPage += delta;
+  renderHistoryTable();
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Episode Detail Modal
+// ─────────────────────────────────────────────────────────────────────
+async function openEpisodeDetail(id) {
+  const overlay = document.getElementById('epDetailOverlay');
+  overlay.style.display = 'flex';
+
+  // Show loading state
+  document.getElementById('epDetailTitle').textContent = '로딩 중...';
+  document.getElementById('epDetailMeta').textContent = id;
+  document.getElementById('epKpiReward').textContent = '…';
+  document.getElementById('epKpiCost').textContent   = '…';
+  document.getElementById('epKpiEss').textContent    = '…';
+  document.getElementById('epKpiRoi').textContent    = '…';
+  document.getElementById('epActionGrid').innerHTML  = '<div class="empty-state"><span class="spinner"></span></div>';
+  document.getElementById('epWorkflowSteps').innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  document.getElementById('epMessages').innerHTML    = '<div class="empty-state"><span class="spinner"></span></div>';
+  document.getElementById('epDecompList').innerHTML  = '<div class="empty-state"><span class="spinner"></span></div>';
+
+  try {
+    const ep = await fetch(`/episodes/${id}`).then(r => {
+      if (!r.ok) throw new Error('not found');
+      return r.json();
+    });
+    renderEpisodeDetail(ep);
+  } catch(e) {
+    document.getElementById('epDetailTitle').textContent = '불러오기 실패';
+    document.getElementById('epDetailMeta').textContent = e.message;
+  }
+}
+
+function closeEpisodeDetail() {
+  document.getElementById('epDetailOverlay').style.display = 'none';
+}
+
+function renderEpisodeDetail(ep) {
+  // Header
+  const ts = new Date(ep.timestamp).toLocaleString('ko-KR', {
+    year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit'
+  });
+  document.getElementById('epDetailTitle').textContent = `에피소드 #${ep.id.slice(0,8)}…`;
+  document.getElementById('epDetailMeta').textContent =
+    `${ts}  │  소스: ${ep.source || 'api'}  │  ID: ${ep.id}`;
+
+  // KPI
+  document.getElementById('epKpiReward').textContent = (ep.reward ?? 0).toFixed(4);
+  document.getElementById('epKpiCost').textContent   = fmt$(ep.cost_saving);
+  document.getElementById('epKpiEss').textContent    = fmt$(ep.ess_profit);
+  document.getElementById('epKpiRoi').textContent    = fmt$(ep.roi);
+
+  // Energy State
+  const st = ep.energy_state || {};
+  const soc = Math.round((st.ess_soc ?? 0.5) * 100);
+  document.getElementById('epSocBar').style.width = soc + '%';
+  document.getElementById('epSocBar').style.background =
+    soc < 20 ? 'var(--red)' : soc < 40 ? 'var(--amber)' : 'var(--primary)';
+  document.getElementById('epSocValue').textContent = soc + '%';
+  const price = st.price || [];
+  const load  = st.load  || [];
+  const gen   = st.generation || [];
+  document.getElementById('epStatePrice').textContent    = price[0] != null ? `$${price[0].toFixed(4)}/kWh` : '—';
+  document.getElementById('epStateLoad').textContent     = load[0]  != null ? `${load[0].toFixed(1)} kW` : '—';
+  document.getElementById('epStateGen').textContent      = gen[0]   != null ? `${gen[0].toFixed(1)} kW` : '—';
+  document.getElementById('epStatePriceMax').textContent = price.length ? `$${Math.max(...price).toFixed(4)}/kWh` : '—';
+  document.getElementById('epStateLoadMax').textContent  = load.length  ? `${Math.max(...load).toFixed(1)} kW` : '—';
+  document.getElementById('epStateGenMax').textContent   = gen.length   ? `${Math.max(...gen).toFixed(1)} kW` : '—';
+
+  // Action
+  const act = ep.action || {};
+  const meta = act.metadata || act.meta || {};
+  const mode = meta.mode || act.mode || '?';
+  const ess  = act.ess  || {};
+  const pv   = act.pv   || {};
+  const load2 = act.load || {};
+  const mkt  = act.market || {};
+  const actionGrid = document.getElementById('epActionGrid');
+  if (Object.keys(act).length === 0) {
+    actionGrid.innerHTML = '<div class="empty-state">액션 정보 없음</div>';
+  } else {
+    actionGrid.innerHTML = `
+      <div class="ep-action-item mode">
+        <div class="ep-action-label">선택 모드</div>
+        <div class="ep-action-value">${modeEmoji(mode)} ${modeLabel(mode)}</div>
+      </div>
+      <div class="ep-action-item">
+        <div class="ep-action-label">Bid</div>
+        <div class="ep-action-value">${(act.bid ?? 0).toFixed(4)}</div>
+      </div>
+      <div class="ep-action-item">
+        <div class="ep-action-label">ESS 충전</div>
+        <div class="ep-action-value">${(ess.charge_rate ?? 0).toFixed(2)} kW</div>
+      </div>
+      <div class="ep-action-item">
+        <div class="ep-action-label">ESS 방전</div>
+        <div class="ep-action-value">${(ess.discharge_rate ?? 0).toFixed(2)} kW</div>
+      </div>
+      <div class="ep-action-item">
+        <div class="ep-action-label">PV 감발</div>
+        <div class="ep-action-value">${((pv.curtailment_ratio ?? 0) * 100).toFixed(1)}%</div>
+      </div>
+      <div class="ep-action-item">
+        <div class="ep-action-label">부하 이동</div>
+        <div class="ep-action-value">${(load2.shift_amount ?? 0).toFixed(2)} kW</div>
+      </div>
+      <div class="ep-action-item">
+        <div class="ep-action-label">시장 수량</div>
+        <div class="ep-action-value">${(mkt.quantity ?? 0).toFixed(2)} kW</div>
+      </div>
+      <div class="ep-action-item">
+        <div class="ep-action-label">시장 가격</div>
+        <div class="ep-action-value">$${(mkt.price ?? 0).toFixed(4)}</div>
+      </div>
+    `;
+  }
+
+  // Workflow Steps
+  const stepsEl = document.getElementById('epWorkflowSteps');
+  const stepEvents = ep.step_events || [];
+  if (!stepEvents.length) {
+    stepsEl.innerHTML = '<div class="empty-state">워크플로우 이력 없음</div>';
+  } else {
+    stepsEl.innerHTML = '';
+    stepEvents.forEach((ev, i) => {
+      const el = buildStepEl(ev, i);
+      el.style.opacity = '1';
+      el.style.transform = 'none';
+      stepsEl.appendChild(el);
+    });
+  }
+
+  // Messages
+  const msgs = ep.messages || [];
+  const msgsEl = document.getElementById('epMessages');
+  if (!msgs.length) {
+    msgsEl.innerHTML = '<div class="empty-state">메시지 없음</div>';
+  } else {
+    msgsEl.innerHTML = msgs.map((m, i) => {
+      const isAgent = typeof m === 'string' && m.length > 0;
+      return `<div class="ep-message ${isAgent ? 'agent' : ''}">
+        <div class="ep-msg-label">메시지 ${i+1}</div>
+        ${typeof m === 'string' ? m : JSON.stringify(m)}
+      </div>`;
+    }).join('');
+  }
+
+  // Reward Decomposition
+  const decomp = ep.reward_decomposition || {};
+  const decompEl = document.getElementById('epDecompList');
+  if (!Object.keys(decomp).length) {
+    decompEl.innerHTML = '<div class="empty-state">보상 분해 정보 없음</div>';
+  } else {
+    const maxAbs = Math.max(...DECOMP_ITEMS.map(d => Math.abs(decomp[d.key] || 0)), 0.001);
+    decompEl.innerHTML = DECOMP_ITEMS.map(item => {
+      const val = decomp[item.key] || 0;
+      const pct = Math.abs(val) / maxAbs * 100;
+      const sign = val >= 0 ? '+' : '';
+      const cls = item.pos ? 'pos' : 'neg';
+      return `<div class="decomp-item">
+        <div class="decomp-label">${item.label}</div>
+        <div class="decomp-bar-wrap">
+          <div class="decomp-bar ${cls}" style="width:${pct}%"></div>
+        </div>
+        <div class="decomp-value ${cls}">${sign}${val.toFixed(4)}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// Close detail modal on overlay click
+document.getElementById('epDetailOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeEpisodeDetail();
+});
 
 // ─────────────────────────────────────────────────────────────────────
 // Boot

@@ -15,12 +15,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-import uuid
 from datetime import datetime, timezone
 
 from .config import settings
-from .db.models import Episode, KPI
-from .db.session import AsyncSessionLocal, init_db
+from .db.history import persist_workflow_run
+from .db.session import init_db
 from .state import Constraints, EnergyState
 from .workflow import run_workflow
 
@@ -66,28 +65,7 @@ async def get_state() -> EnergyState:
 
 
 async def store(state: EnergyState, result: dict) -> None:
-    selected = result.get("selected")
-    reward = result.get("reward", 0.0)
-    decomp = selected.metadata.get("reward_decomposition", {}) if selected else {}
-
-    async with AsyncSessionLocal() as session:
-        ep = Episode(
-            id=str(uuid.uuid4()),
-            timestamp=datetime.now(timezone.utc),
-            state=state.model_dump(),
-            action=selected.model_dump() if selected else {},
-            reward=reward,
-        )
-        kpi = KPI(
-            id=str(uuid.uuid4()),
-            timestamp=datetime.now(timezone.utc),
-            cost_saving=decomp.get("cost_saving", reward * 0.3),
-            ess_profit=decomp.get("ess_profit", reward * 0.3),
-            roi=decomp.get("solar_roi", reward * 0.2),
-        )
-        session.add(ep)
-        session.add(kpi)
-        await session.commit()
+    await persist_workflow_run(state, result, source="loop")
 
 
 # ---------------------------------------------------------------------------

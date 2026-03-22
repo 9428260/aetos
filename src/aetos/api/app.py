@@ -5,6 +5,7 @@ Endpoints:
   POST /run           – trigger one optimization cycle
   GET  /kpi           – cumulative KPI totals
   GET  /episodes      – recent episode history
+  GET  /episodes/{id} – full workflow trace for one episode
   GET  /health        – liveness probe
 """
 
@@ -19,13 +20,14 @@ from pathlib import Path
 from typing import Annotated
 
 import uvicorn
-from fastapi import Depends, FastAPI, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..db.history import persist_workflow_run
 from ..db.models import Episode, KPI
 from ..db.session import AsyncSessionLocal, get_session, init_db
 from ..state import Constraints, EnergyState
@@ -85,8 +87,24 @@ class RunResponse(BaseModel):
 class EpisodeItem(BaseModel):
     id: str
     timestamp: str
+    source: str
     reward: float
     mode: str
+    cost_saving: float
+    ess_profit: float
+    roi: float
+
+
+class EpisodeDetail(BaseModel):
+    id: str
+    timestamp: str
+    source: str
+    energy_state: dict
+    action: dict
+    reward: float
+    reward_decomposition: dict
+    messages: list[str]
+    step_events: list[dict]
     cost_saving: float
     ess_profit: float
     roi: float
@@ -150,36 +168,17 @@ async def _persist(energy: EnergyState, result: dict, decomp: dict) -> None:
     selected = result.get("selected")
     reward = result.get("reward", 0.0)
 
-    record = {
-        "id": str(uuid.uuid4()),
+    ep_id = await persist_workflow_run(energy, result, source="api")
+    _mem_episodes.appendleft({
+        "id": ep_id or str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "reward": reward,
+        "source": "api",
         "mode": selected.metadata.get("mode", "?") if selected else "none",
         "cost_saving": decomp.get("cost_saving", reward * 0.3),
         "ess_profit": decomp.get("ess_profit", reward * 0.3),
         "roi": decomp.get("solar_roi", reward * 0.2),
-    }
-    _mem_episodes.appendleft(record)
-
-    try:
-        async with AsyncSessionLocal() as session:
-            session.add(Episode(
-                id=record["id"],
-                timestamp=datetime.now(timezone.utc),
-                state=energy.model_dump(),
-                action=selected.model_dump() if selected else {},
-                reward=reward,
-            ))
-            session.add(KPI(
-                id=str(uuid.uuid4()),
-                timestamp=datetime.now(timezone.utc),
-                cost_saving=record["cost_saving"],
-                ess_profit=record["ess_profit"],
-                roi=record["roi"],
-            ))
-            await session.commit()
-    except Exception as e:
-        logger.debug("DB persist skipped: %s", e)
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +236,7 @@ async def get_episodes(limit: int = Query(default=50, le=200)) -> list[EpisodeIt
             rows = (
                 await session.execute(
                     select(Episode, KPI)
-                    .join(KPI, Episode.timestamp == KPI.timestamp, isouter=True)
+                    .outerjoin(KPI, Episode.id == KPI.episode_id)
                     .order_by(desc(Episode.timestamp))
                     .limit(limit)
                 )
@@ -248,6 +247,7 @@ async def get_episodes(limit: int = Query(default=50, le=200)) -> list[EpisodeIt
                     items.append(EpisodeItem(
                         id=ep.id,
                         timestamp=ep.timestamp.isoformat(),
+                        source=getattr(ep, "source", None) or "api",
                         reward=ep.reward,
                         mode=ep.action.get("metadata", {}).get("mode", "?") if ep.action else "?",
                         cost_saving=kpi.cost_saving if kpi else ep.reward * 0.3,
@@ -260,9 +260,72 @@ async def get_episodes(limit: int = Query(default=50, le=200)) -> list[EpisodeIt
 
     # in-memory fallback
     return [
-        EpisodeItem(**{k: v for k, v in ep.items() if k != "state"})
+        EpisodeItem(
+            id=ep["id"],
+            timestamp=ep["timestamp"],
+            source=ep.get("source", "api"),
+            reward=ep["reward"],
+            mode=ep["mode"],
+            cost_saving=ep["cost_saving"],
+            ess_profit=ep["ess_profit"],
+            roi=ep["roi"],
+        )
         for ep in list(_mem_episodes)[:limit]
     ]
+
+
+@app.get("/episodes/{episode_id}", response_model=EpisodeDetail)
+async def get_episode(episode_id: str) -> EpisodeDetail:
+    """Return one episode including full workflow trace (for audit / replay)."""
+    try:
+        async with AsyncSessionLocal() as session:
+            row = (
+                await session.execute(
+                    select(Episode, KPI)
+                    .outerjoin(KPI, Episode.id == KPI.episode_id)
+                    .where(Episode.id == episode_id)
+                )
+            ).one_or_none()
+            if not row:
+                raise HTTPException(status_code=404, detail="episode not found")
+            ep, kpi = row
+            rd = ep.reward_decomposition if isinstance(ep.reward_decomposition, dict) else {}
+            return EpisodeDetail(
+                id=ep.id,
+                timestamp=ep.timestamp.isoformat(),
+                source=getattr(ep, "source", None) or "api",
+                energy_state=ep.state,
+                action=ep.action,
+                reward=ep.reward,
+                reward_decomposition=rd,
+                messages=list(ep.messages or []),
+                step_events=list(ep.step_events or []),
+                cost_saving=kpi.cost_saving if kpi else float(rd.get("cost_saving", ep.reward * 0.3)),
+                ess_profit=kpi.ess_profit if kpi else float(rd.get("ess_profit", ep.reward * 0.3)),
+                roi=kpi.roi if kpi else float(rd.get("solar_roi", ep.reward * 0.2)),
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    for ep in _mem_episodes:
+        if ep["id"] == episode_id:
+            return EpisodeDetail(
+                id=ep["id"],
+                timestamp=ep["timestamp"],
+                source=ep.get("source", "api"),
+                energy_state={},
+                action={},
+                reward=ep["reward"],
+                reward_decomposition={},
+                messages=[],
+                step_events=[],
+                cost_saving=ep["cost_saving"],
+                ess_profit=ep["ess_profit"],
+                roi=ep["roi"],
+            )
+    raise HTTPException(status_code=404, detail="episode not found")
 
 
 @app.get("/kpi", response_model=KPIResponse)
@@ -270,20 +333,29 @@ async def get_kpi() -> KPIResponse:
     """Return cumulative KPI totals."""
     try:
         async with AsyncSessionLocal() as session:
-            row = (
+            kpi_row = (
                 await session.execute(
                     select(
                         func.coalesce(func.sum(KPI.cost_saving), 0.0),
                         func.coalesce(func.sum(KPI.ess_profit), 0.0),
                         func.coalesce(func.sum(KPI.roi), 0.0),
+                    )
+                )
+            ).one()
+            ep_row = (
+                await session.execute(
+                    select(
                         func.coalesce(func.avg(Episode.reward), 0.0),
-                        func.count(KPI.id),
+                        func.count(Episode.id),
                     )
                 )
             ).one()
             return KPIResponse(
-                cost_saving=row[0], ess_profit=row[1], roi=row[2],
-                avg_reward=row[3], n_episodes=row[4],
+                cost_saving=kpi_row[0],
+                ess_profit=kpi_row[1],
+                roi=kpi_row[2],
+                avg_reward=ep_row[0],
+                n_episodes=int(ep_row[1]),
             )
     except Exception:
         pass
