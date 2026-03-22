@@ -32,6 +32,7 @@ header {
 .logo { display: flex; align-items: center; gap: 10px; }
 .logo h1 { font-size: 18px; font-weight: 700; letter-spacing: .5px; }
 .logo span { font-size: 22px; }
+.header-right { display: flex; align-items: center; gap: 16px; }
 .badge-live { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
   background: var(--primary-dim); color: var(--primary); border: 1px solid var(--primary);
   display: flex; align-items: center; gap: 5px; }
@@ -51,6 +52,46 @@ header .meta { color: var(--muted); font-size: 12px; }
 .btn-run:disabled { background: var(--muted); cursor: not-allowed; transform: none; }
 
 /* ── Layout ── */
+.app-shell { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: calc(100vh - 67px); }
+.lnb {
+  border-right: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(0,212,170,0.08), rgba(8,13,26,0) 160px),
+    var(--card);
+  padding: 18px 16px;
+  position: sticky;
+  top: 67px;
+  height: calc(100vh - 67px);
+}
+.lnb-title {
+  font-size: 11px; font-weight: 700; letter-spacing: .9px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 12px;
+}
+.lnb-group { margin-bottom: 18px; }
+.lnb-nav { display: flex; flex-direction: column; gap: 8px; }
+.lnb-link {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px; text-decoration: none;
+  color: var(--text); background: transparent; border: 1px solid transparent;
+  transition: .2s ease;
+}
+.lnb-link:hover {
+  background: var(--card2);
+  border-color: var(--border);
+  transform: translateX(2px);
+}
+.lnb-link .icon { width: 16px; text-align: center; color: var(--primary); }
+.lnb-action {
+  background: var(--card2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px;
+}
+.lnb-action h3 { font-size: 13px; margin-bottom: 6px; }
+.lnb-action p { color: var(--muted); font-size: 12px; line-height: 1.5; margin-bottom: 12px; }
+.lnb-status {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; color: var(--muted); margin-bottom: 10px;
+}
+.content { min-width: 0; }
 .main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 24px; }
 .full { grid-column: 1 / -1; }
 
@@ -168,8 +209,170 @@ header .meta { color: var(--muted); font-size: 12px; }
 .section-gap { margin-bottom: 4px; }
 
 @media (max-width: 900px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .lnb {
+    position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border);
+  }
   .main { grid-template-columns: 1fr; }
   .kpi-bar { grid-template-columns: repeat(2, 1fr); }
+  .header-right { gap: 10px; }
+}
+
+@media (max-width: 640px) {
+  header { padding: 14px 16px; }
+  .main { padding: 16px; }
+  .header-right { flex-direction: column; align-items: flex-end; gap: 6px; }
+  .kpi-bar { grid-template-columns: 1fr; }
+}
+
+/* ═══════════════════════════════════════════════════
+   Agent Execution Overlay
+═══════════════════════════════════════════════════ */
+.agent-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(8,13,26,0.9); backdrop-filter: blur(8px);
+  animation: aoFade .35s ease;
+}
+@keyframes aoFade { from{opacity:0} to{opacity:1} }
+
+.ao-panel {
+  background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+  width: min(1020px, 96vw); max-height: 93vh; overflow-y: auto;
+  padding: 22px 24px; display: flex; flex-direction: column; gap: 14px;
+  box-shadow: 0 0 80px rgba(0,212,170,0.15), 0 0 0 1px rgba(0,212,170,0.1);
+  scrollbar-width: thin;
+}
+.ao-panel::-webkit-scrollbar { width: 4px; }
+.ao-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Header */
+.ao-header { display: flex; align-items: flex-start; justify-content: space-between; }
+.ao-brand { font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+.ao-brand-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--primary); animation: pulse 1s infinite; }
+.ao-phase { font-size: 12px; color: var(--primary); margin-top: 5px; min-height: 18px; transition: all .3s; }
+.ao-timer { font-size: 24px; font-weight: 700; color: var(--muted); font-family: monospace; font-variant-numeric: tabular-nums; }
+
+/* Pipeline */
+.ao-pipeline {
+  display: flex; align-items: center; gap: 6px;
+  padding: 12px 14px; background: var(--card2);
+  border: 1px solid var(--border); border-radius: 10px;
+}
+.ao-pipe-step {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  flex: 1; padding: 8px 6px; border-radius: 8px;
+  border: 1px solid transparent; transition: all .35s; opacity: 0.35;
+}
+.ao-pipe-step[data-status=running] {
+  background: var(--primary-dim); border-color: var(--primary); opacity: 1;
+  animation: pipeGlow 1.2s ease infinite;
+}
+.ao-pipe-step[data-status=done] {
+  background: rgba(0,212,170,0.08); border-color: rgba(0,212,170,0.3); opacity: 1;
+}
+@keyframes pipeGlow {
+  0%,100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 12px rgba(0,212,170,0.5); }
+}
+.ao-pipe-icon { font-size: 18px; }
+.ao-pipe-label { font-size: 10px; font-weight: 700; color: var(--text); text-align: center; }
+.ao-pipe-sub { font-size: 9px; color: var(--muted); transition: color .3s; }
+.ao-pipe-step[data-status=running] .ao-pipe-sub { color: var(--primary); }
+.ao-pipe-step[data-status=done] .ao-pipe-sub { color: var(--primary); }
+.ao-pipe-arrow { color: var(--muted); font-size: 14px; flex-shrink: 0; }
+
+/* Body grid */
+.ao-body { display: grid; grid-template-columns: 1fr 270px; gap: 14px; }
+
+/* Strategy Battle Arena */
+.ao-arena { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.ao-arena-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.ao-arena-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+.ao-arena-phase { font-size: 11px; color: var(--primary); font-weight: 600; padding: 2px 8px; background: var(--primary-dim); border-radius: 10px; }
+.ao-battle-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+
+/* Strategy Card */
+.sc {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 11px 12px; position: relative;
+  overflow: hidden; transition: all .5s ease;
+  opacity: 0; transform: translateY(14px);
+}
+.sc.visible { opacity: 1; transform: translateY(0); }
+.sc::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--sc-color, var(--muted)); }
+.sc.eliminated { opacity: 0.28; border-color: rgba(239,68,68,0.25); }
+.sc.eliminated::before { background: var(--red); }
+.sc.advancing { border-color: rgba(0,212,170,0.45); }
+.sc.winner { border-color: var(--amber); animation: winnerGlow 1.5s ease infinite; }
+.sc.winner::before { background: var(--amber); }
+@keyframes winnerGlow {
+  0%,100% { box-shadow: 0 0 20px rgba(245,158,11,0.2); }
+  50% { box-shadow: 0 0 40px rgba(245,158,11,0.5), 0 0 80px rgba(245,158,11,0.15); }
+}
+.sc-crown { position: absolute; top: 6px; right: 8px; font-size: 16px; opacity: 0; transition: opacity .6s; }
+.sc.winner .sc-crown { opacity: 1; }
+.sc-name { font-size: 11px; font-weight: 700; color: var(--text); margin-bottom: 8px; line-height: 1.3; }
+.sc-bid-lbl { font-size: 9px; color: var(--muted); margin-bottom: 2px; }
+.sc-bar-wrap { position: relative; height: 6px; background: var(--border); border-radius: 3px; margin-bottom: 4px; overflow: visible; }
+.sc-bar { height: 100%; border-radius: 3px; background: var(--sc-color, var(--primary)); transition: width 1s cubic-bezier(0.34,1.4,0.64,1); width: 0%; }
+.sc-clear { position: absolute; top: -5px; bottom: -5px; width: 2px; background: rgba(239,68,68,0.75); border-radius: 1px; display: none; z-index: 2; }
+.sc-bid-row { display: flex; align-items: baseline; gap: 5px; margin-bottom: 7px; }
+.sc-bid-val { font-size: 14px; font-weight: 700; color: var(--sc-color, var(--primary)); }
+.sc-bid-delta { font-size: 10px; color: var(--primary); display: none; }
+.sc-badge {
+  display: inline-block; padding: 2px 7px; border-radius: 10px;
+  font-size: 9px; font-weight: 700;
+  background: var(--card); color: var(--muted); border: 1px solid var(--border); transition: all .3s;
+}
+.sc-badge.optimizing { background: rgba(59,130,246,0.15); color: var(--blue); border-color: var(--blue); }
+.sc-badge.competing  { background: rgba(139,92,246,0.15); color: #8b5cf6; border-color: #8b5cf6; }
+.sc-badge.elim       { background: rgba(239,68,68,0.15); color: var(--red); border-color: var(--red); }
+.sc-badge.advancing  { background: var(--primary-dim); color: var(--primary); border-color: var(--primary); }
+.sc-badge.winner     { background: rgba(245,158,11,0.2); color: var(--amber); border-color: var(--amber); }
+.sc-elim-stamp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transition: opacity .5s; }
+.sc.eliminated .sc-elim-stamp { opacity: 1; }
+.sc-elim-txt { font-size: 13px; font-weight: 900; letter-spacing: 2px; color: rgba(239,68,68,0.55); transform: rotate(-12deg); border: 2px solid rgba(239,68,68,0.3); padding: 2px 7px; border-radius: 3px; }
+
+/* Agent Log */
+.ao-log { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; display: flex; flex-direction: column; overflow: hidden; }
+.ao-log-hdr { padding: 8px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.ao-log-body { flex: 1; overflow-y: auto; padding: 8px 10px; font-family: 'Courier New', monospace; font-size: 10.5px; display: flex; flex-direction: column; gap: 3px; max-height: 300px; min-height: 80px; }
+.ao-log-body::-webkit-scrollbar { width: 3px; }
+.ao-log-body::-webkit-scrollbar-thumb { background: var(--border); }
+.ao-log-entry { display: flex; gap: 6px; opacity: 0; animation: logIn .25s ease forwards; }
+@keyframes logIn { to { opacity: 1; } }
+.ao-log-ts  { color: rgba(100,116,139,0.55); white-space: nowrap; flex-shrink: 0; }
+.ao-log-msg { color: #94a3b8; }
+.ao-log-entry.hi   .ao-log-msg { color: var(--primary); font-weight: 600; }
+.ao-log-entry.warn .ao-log-msg { color: var(--amber); }
+.ao-log-entry.err  .ao-log-msg { color: var(--red); }
+
+/* Result Footer */
+.ao-footer { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: rgba(0,212,170,0.05); border: 1px solid rgba(0,212,170,0.2); border-radius: 10px; animation: aoFade .6s ease; }
+.ao-result { display: flex; gap: 32px; }
+.ao-res-item { display: flex; flex-direction: column; gap: 3px; }
+.ao-res-label { font-size: 11px; color: var(--muted); }
+.ao-res-mode   { font-size: 15px; font-weight: 700; color: var(--amber); }
+.ao-res-reward { font-size: 15px; font-weight: 700; color: var(--primary); }
+.ao-res-change { font-size: 12px; font-weight: 700; }
+.ao-close-btn { padding: 10px 24px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 700; background: var(--primary); color: #000; transition: .2s; }
+.ao-close-btn:hover { background: #00b899; transform: translateY(-1px); }
+
+/* Strategy-changed banner (on main dashboard) */
+.strat-change-banner {
+  display: none; align-items: center; gap: 10px;
+  padding: 9px 14px; background: rgba(245,158,11,0.09);
+  border: 1px solid rgba(245,158,11,0.3); border-radius: 8px;
+  font-size: 12px; margin-bottom: 4px; animation: aoFade .5s ease;
+}
+.strat-change-banner.visible { display: flex; }
+
+@media (max-width: 720px) {
+  .ao-body { grid-template-columns: 1fr; }
+  .ao-battle-grid { grid-template-columns: repeat(2,1fr); }
+  .ao-pipeline { flex-wrap: wrap; gap: 4px; }
+  .ao-pipe-arrow { display: none; }
 }
 </style>
 </head>
@@ -184,20 +387,56 @@ header .meta { color: var(--muted); font-size: 12px; }
       <div style="font-size:10px;color:var(--muted);margin-top:2px">Autonomous Agentic Energy Trading & Optimization</div>
     </div>
   </div>
-  <div id="statusBadge" class="badge-live">
-    <span class="dot"></span><span id="statusText">IDLE</span>
+  <div class="header-right">
+    <div id="statusBadge" class="badge-live">
+      <span class="dot"></span><span id="statusText">IDLE</span>
+    </div>
+    <div class="meta" id="lastRunMeta">아직 실행되지 않음</div>
   </div>
-  <div class="meta" id="lastRunMeta">아직 실행되지 않음</div>
-  <button class="btn-run" id="btnRun" onclick="runOptimization()">
-    <span>▶</span> RUN NOW
-  </button>
 </header>
 
+<div class="app-shell">
+  <aside class="lnb">
+    <div class="lnb-group">
+      <div class="lnb-title">Navigation</div>
+      <nav class="lnb-nav">
+        <a class="lnb-link" href="#overview"><span class="icon">◈</span><span>Overview</span></a>
+        <a class="lnb-link" href="#workflow"><span class="icon">↺</span><span>Workflow</span></a>
+        <a class="lnb-link" href="#strategy"><span class="icon">▣</span><span>Strategy</span></a>
+        <a class="lnb-link" href="#history"><span class="icon">☰</span><span>Episodes</span></a>
+      </nav>
+    </div>
+
+    <div class="lnb-group">
+      <div class="lnb-title">Actions</div>
+      <div class="lnb-action">
+        <div class="lnb-status">
+          <span>Manual Trigger</span>
+          <span id="lnbStatusText">READY</span>
+        </div>
+        <h3>Optimization Run</h3>
+        <p>현재 상태 기준으로 에이전트 워크플로우를 즉시 실행합니다.</p>
+        <button class="btn-run" id="btnRun" onclick="runOptimization()">
+          <span>▶</span> RUN NOW
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="content">
 <!-- ─────────────── Main Grid ─────────────── -->
 <div class="main">
 
-  <!-- KPI Bar (full width) -->
+  <!-- Strategy Change Banner -->
   <div class="full">
+    <div class="strat-change-banner" id="stratChangeBanner">
+      <span>⚡</span>
+      <span id="stratChangeBannerText"></span>
+    </div>
+  </div>
+
+  <!-- KPI Bar (full width) -->
+  <div class="full" id="overview">
     <div class="kpi-bar">
       <div class="kpi-card">
         <div class="kpi-label">💰 누적 비용 절감</div>
@@ -247,7 +486,7 @@ header .meta { color: var(--muted); font-size: 12px; }
   </div>
 
   <!-- ── Right: Workflow Trace ── -->
-  <div class="card">
+  <div class="card" id="workflow">
     <div class="card-title"><span class="icon">🤖</span>Agentic Workflow 실행 추적</div>
     <div class="workflow-steps" id="workflowSteps">
       <div class="empty-state">▶ RUN NOW 버튼을 눌러 에이전트를 실행하세요</div>
@@ -255,7 +494,7 @@ header .meta { color: var(--muted); font-size: 12px; }
   </div>
 
   <!-- ── Left: Strategy Comparison ── -->
-  <div class="card">
+  <div class="card" id="strategy">
     <div class="card-title"><span class="icon">📊</span>전략 비교 (Bid 값)</div>
     <div id="strategyLegend" class="strategy-legend"></div>
     <div class="chart-wrap">
@@ -277,7 +516,7 @@ header .meta { color: var(--muted); font-size: 12px; }
   </div>
 
   <!-- ── KPI Trends (full width) ── -->
-  <div class="card full">
+  <div class="card full" id="history">
     <div class="kpi-trend-header">
       <div class="card-title" style="margin-bottom:0"><span class="icon">📈</span>KPI 추이 (최근 에피소드)</div>
       <div class="trend-tabs">
@@ -314,6 +553,103 @@ header .meta { color: var(--muted); font-size: 12px; }
   </div>
 
 </div><!-- /main -->
+</div><!-- /content -->
+</div><!-- /app-shell -->
+
+<!-- ─────────────── Agent Execution Overlay ─────────────── -->
+<div id="agentOverlay" class="agent-overlay" style="display:none">
+  <div class="ao-panel">
+
+    <!-- Header -->
+    <div class="ao-header">
+      <div>
+        <div class="ao-brand">
+          <div class="ao-brand-dot"></div>
+          🤖 Agentic AI Optimization
+        </div>
+        <div class="ao-phase" id="aoPhase">에이전트 초기화 중...</div>
+      </div>
+      <div class="ao-timer" id="aoTimer">00:00</div>
+    </div>
+
+    <!-- Pipeline Steps -->
+    <div class="ao-pipeline">
+      <div class="ao-pipe-step" id="pipe-generate" data-status="idle">
+        <div class="ao-pipe-icon">🎯</div>
+        <div class="ao-pipe-label">Generate</div>
+        <div class="ao-pipe-sub" id="pipe-generate-sub">대기</div>
+      </div>
+      <div class="ao-pipe-arrow">→</div>
+      <div class="ao-pipe-step" id="pipe-optimize" data-status="idle">
+        <div class="ao-pipe-icon">⚡</div>
+        <div class="ao-pipe-label">Optimize</div>
+        <div class="ao-pipe-sub" id="pipe-optimize-sub">대기</div>
+      </div>
+      <div class="ao-pipe-arrow">→</div>
+      <div class="ao-pipe-step" id="pipe-auction" data-status="idle">
+        <div class="ao-pipe-icon">🏛️</div>
+        <div class="ao-pipe-label">CDA Auction</div>
+        <div class="ao-pipe-sub" id="pipe-auction-sub">대기</div>
+      </div>
+      <div class="ao-pipe-arrow">→</div>
+      <div class="ao-pipe-step" id="pipe-critique" data-status="idle">
+        <div class="ao-pipe-icon">🧠</div>
+        <div class="ao-pipe-label">MetaCritic</div>
+        <div class="ao-pipe-sub" id="pipe-critique-sub">대기</div>
+      </div>
+      <div class="ao-pipe-arrow">→</div>
+      <div class="ao-pipe-step" id="pipe-dispatch" data-status="idle">
+        <div class="ao-pipe-icon">📡</div>
+        <div class="ao-pipe-label">Dispatch</div>
+        <div class="ao-pipe-sub" id="pipe-dispatch-sub">대기</div>
+      </div>
+    </div>
+
+    <!-- Body: Arena + Log -->
+    <div class="ao-body">
+
+      <!-- Strategy Battle Arena -->
+      <div class="ao-arena">
+        <div class="ao-arena-header">
+          <span class="ao-arena-title">⚔️ 전략 경쟁 현황</span>
+          <span class="ao-arena-phase" id="aoArenaPhase"></span>
+        </div>
+        <div class="ao-battle-grid" id="aoBattleGrid">
+          <div style="grid-column:1/-1;text-align:center;padding:36px;color:var(--muted);font-size:13px">
+            에이전트 시작을 기다리는 중...
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent Log -->
+      <div class="ao-log">
+        <div class="ao-log-hdr">🖥 Agent Log</div>
+        <div class="ao-log-body" id="aoLogBody"></div>
+      </div>
+
+    </div>
+
+    <!-- Result Footer (shown after completion) -->
+    <div class="ao-footer" id="aoFooter" style="display:none">
+      <div class="ao-result">
+        <div class="ao-res-item">
+          <span class="ao-res-label">🏆 선택된 전략</span>
+          <span class="ao-res-mode" id="aoResMode">—</span>
+        </div>
+        <div class="ao-res-item">
+          <span class="ao-res-label">📊 Reward</span>
+          <span class="ao-res-reward" id="aoResReward">—</span>
+        </div>
+        <div class="ao-res-item">
+          <span class="ao-res-label">🔄 전략 변경</span>
+          <span class="ao-res-change" id="aoResChange" style="color:var(--muted)">—</span>
+        </div>
+      </div>
+      <button class="ao-close-btn" onclick="closeAgentOverlay()">대시보드 확인 →</button>
+    </div>
+
+  </div>
+</div>
 
 <script>
 // ─────────────────────────────────────────────────────────────────────
@@ -324,6 +660,8 @@ let currentEnergyTab = 'price';
 let currentTrendMetric = 'reward';
 let lastEnergyState = null;
 let episodes = [];
+let lastSelectedMode = null;
+let _timerInterval = null;
 
 const MODE_COLORS = {
   aggressive_discharge: '#ef4444',
@@ -334,6 +672,21 @@ const MODE_COLORS = {
   conservative:        '#64748b',
 };
 function modeColor(mode) { return MODE_COLORS[mode] || '#64748b'; }
+
+const MODE_LABELS = {
+  aggressive_discharge: '공격적 방전',
+  solar_first:         '태양광 우선',
+  load_shifting:       '부하 이동',
+  ess_charge:          'ESS 충전',
+  market_arbitrage:    '시장 차익',
+  conservative:        '보수적 운영',
+};
+const MODE_EMOJIS = {
+  aggressive_discharge: '⚡', solar_first: '☀️', load_shifting: '🔄',
+  ess_charge: '🔋', market_arbitrage: '📈', conservative: '🛡️',
+};
+function modeLabel(mode) { return MODE_LABELS[mode] || mode?.replace(/_/g,' ') || '?'; }
+function modeEmoji(mode) { return MODE_EMOJIS[mode] || '●'; }
 
 // ─────────────────────────────────────────────────────────────────────
 // Init
@@ -354,55 +707,62 @@ async function runOptimization() {
   const btn = document.getElementById('btnRun');
   const badge = document.getElementById('statusBadge');
   const statusText = document.getElementById('statusText');
+  const lnbStatusText = document.getElementById('lnbStatusText');
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> 실행 중...';
   badge.classList.add('running');
   statusText.textContent = 'RUNNING';
+  lnbStatusText.textContent = 'RUNNING';
 
   clearWorkflowSteps();
+  showAgentOverlay();
 
+  let runData = null;
   try {
     const res = await fetch('/run', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({goal: 'optimize'}),
     });
-    const data = await res.json();
+    runData = await res.json();
 
-    // Update last run time
-    const ts = new Date(data.timestamp);
+    // Update header timestamp
+    const ts = new Date(runData.timestamp);
     document.getElementById('lastRunMeta').textContent =
-      `최근 실행: ${ts.toLocaleTimeString('ko-KR')}  │  Reward: ${data.reward.toFixed(4)}`;
+      `최근 실행: ${ts.toLocaleTimeString('ko-KR')}  │  Reward: ${runData.reward.toFixed(4)}`;
 
-    // Animate workflow
-    await animateWorkflowSteps(data.step_events);
-
-    // Update charts
-    if (data.energy_state) {
-      lastEnergyState = data.energy_state;
-      updateSOC(data.energy_state.ess_soc);
-      updateEnergyChart(data.energy_state);
-    }
-    if (data.all_strategies?.length) {
-      updateStrategyChart(data.all_strategies, data.selected_strategy);
-    }
-    if (data.reward_decomposition) {
-      updateDecomposition(data.reward_decomposition);
-    }
-
-    // Refresh KPI & episodes
-    await loadKPI();
-    await loadEpisodes();
+    // Run overlay animation (awaited — button stays disabled until animation completes)
+    await animateAgentRun(runData);
 
   } catch(e) {
     console.error(e);
+    closeAgentOverlay();
     alert('실행 오류: ' + e.message);
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<span>▶</span> RUN NOW';
     badge.classList.remove('running');
     statusText.textContent = 'IDLE';
+    lnbStatusText.textContent = 'READY';
+  }
+
+  // Update main dashboard after animation (overlay still visible — user can see update)
+  if (runData) {
+    if (runData.energy_state) {
+      lastEnergyState = runData.energy_state;
+      updateSOC(runData.energy_state.ess_soc);
+      updateEnergyChart(runData.energy_state);
+    }
+    if (runData.all_strategies?.length) {
+      updateStrategyChart(runData.all_strategies, runData.selected_strategy);
+    }
+    if (runData.reward_decomposition) {
+      updateDecomposition(runData.reward_decomposition);
+    }
+    await animateWorkflowSteps(runData.step_events);
+    await loadKPI();
+    await loadEpisodes();
   }
 }
 
@@ -774,6 +1134,333 @@ function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 function fmt$(v) {
   const n = parseFloat(v) || 0;
   return '$' + n.toFixed(2);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Agent Overlay — Core Controls
+// ─────────────────────────────────────────────────────────────────────
+function showAgentOverlay() {
+  const el = document.getElementById('agentOverlay');
+  el.style.display = 'flex';
+  el.style.opacity = '';
+  el.style.transition = '';
+
+  // Reset all pipeline steps
+  ['generate','optimize','auction','critique','dispatch'].forEach(n => {
+    document.getElementById(`pipe-${n}`).dataset.status = 'idle';
+    document.getElementById(`pipe-${n}-sub`).textContent = '대기';
+  });
+  document.getElementById('aoPhase').textContent = '에이전트 초기화 중...';
+  document.getElementById('aoTimer').textContent = '00:00';
+  document.getElementById('aoFooter').style.display = 'none';
+  document.getElementById('aoLogBody').innerHTML = '';
+  document.getElementById('aoBattleGrid').innerHTML =
+    '<div style="grid-column:1/-1;text-align:center;padding:36px;color:var(--muted);font-size:13px">에이전트 시작을 기다리는 중...</div>';
+  document.getElementById('aoArenaPhase').textContent = '';
+
+  // Start elapsed timer
+  clearInterval(_timerInterval);
+  const start = Date.now();
+  _timerInterval = setInterval(() => {
+    const s = Math.floor((Date.now() - start) / 1000);
+    document.getElementById('aoTimer').textContent =
+      `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  }, 500);
+}
+
+function closeAgentOverlay() {
+  clearInterval(_timerInterval);
+  const el = document.getElementById('agentOverlay');
+  el.style.transition = 'opacity .3s';
+  el.style.opacity = '0';
+  setTimeout(() => {
+    el.style.display = 'none';
+    el.style.opacity = '';
+    el.style.transition = '';
+  }, 320);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Agent Overlay — Helpers
+// ─────────────────────────────────────────────────────────────────────
+function setPhase(text) { document.getElementById('aoPhase').textContent = text; }
+function setArenaPhase(text) { document.getElementById('aoArenaPhase').textContent = text; }
+
+function setPipeRunning(node) {
+  document.getElementById(`pipe-${node}`).dataset.status = 'running';
+  document.getElementById(`pipe-${node}-sub`).textContent = '실행 중...';
+}
+function setPipeDone(node, durationMs) {
+  document.getElementById(`pipe-${node}`).dataset.status = 'done';
+  document.getElementById(`pipe-${node}-sub`).textContent =
+    durationMs ? `✓ ${durationMs}ms` : '✓ 완료';
+}
+
+function addLog(msg, type = '') {
+  const body = document.getElementById('aoLogBody');
+  const now = new Date();
+  const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  const entry = document.createElement('div');
+  entry.className = `ao-log-entry${type ? ' '+type : ''}`;
+  entry.innerHTML = `<span class="ao-log-ts">${ts}</span><span class="ao-log-msg">${msg}</span>`;
+  body.appendChild(entry);
+  body.scrollTop = body.scrollHeight;
+}
+
+function buildStrategyCard(strategy, maxBid) {
+  const color = modeColor(strategy.mode);
+  const bidPct = maxBid > 0 ? (strategy.bid / maxBid * 100).toFixed(1) : 50;
+  const div = document.createElement('div');
+  div.className = 'sc';
+  div.dataset.stratId = strategy.id;
+  div.style.setProperty('--sc-color', color);
+  div.innerHTML = `
+    <div class="sc-crown">🏆</div>
+    <div class="sc-name">${modeEmoji(strategy.mode)} ${modeLabel(strategy.mode)}</div>
+    <div class="sc-bid-lbl">Bid Value</div>
+    <div class="sc-bar-wrap">
+      <div class="sc-bar" style="width:0%"></div>
+      <div class="sc-clear" id="cl-${strategy.id}"></div>
+    </div>
+    <div class="sc-bid-row">
+      <span class="sc-bid-val" id="bv-${strategy.id}">0.0000</span>
+      <span class="sc-bid-delta" id="bd-${strategy.id}"></span>
+    </div>
+    <span class="sc-badge" id="badge-${strategy.id}">생성됨</span>
+    <div class="sc-elim-stamp"><div class="sc-elim-txt">탈락</div></div>`;
+  return div;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Agent Overlay — Main Animation Sequence
+// ─────────────────────────────────────────────────────────────────────
+async function animateAgentRun(data) {
+  const events = {};
+  for (const ev of (data.step_events || [])) events[ev.node] = ev;
+
+  const genEv  = events.generate;
+  const optEv  = events.optimize;
+  const auctEv = events.auction;
+  const critEv = events.critique;
+  const dispEv = events.dispatch;
+
+  const genStrategies = genEv?.strategies || data.all_strategies || [];
+  const optStrategies = optEv?.strategies || data.all_strategies || genStrategies;
+
+  // ── Phase 1: Generate ──────────────────────────────────────
+  setPipeRunning('generate');
+  setPhase('🎯 전략 후보 생성 중...');
+  setArenaPhase('후보 생성');
+  addLog('에이전트 워크플로우 시작', 'hi');
+  addLog(`strategy_generator: ${genStrategies.length}가지 운영 모드 탐색`);
+  await delay(300);
+
+  const maxInitBid = Math.max(...genStrategies.map(s => s.bid), 0.001);
+  const grid = document.getElementById('aoBattleGrid');
+  grid.innerHTML = '';
+
+  for (let i = 0; i < genStrategies.length; i++) {
+    await delay(110);
+    const s = genStrategies[i];
+    const card = buildStrategyCard(s, maxInitBid);
+    grid.appendChild(card);
+    await delay(20);
+    card.classList.add('visible');
+    await delay(60);
+    const pct = (s.bid / maxInitBid * 100).toFixed(1);
+    card.querySelector('.sc-bar').style.width = pct + '%';
+    card.querySelector(`#bv-${s.id}`).textContent = s.bid.toFixed(4);
+  }
+
+  addLog(`✓ ${genStrategies.length}개 전략 후보 생성 완료`);
+  await delay(250);
+  setPipeDone('generate', genEv?.duration_ms);
+
+  // ── Phase 2: Optimize ──────────────────────────────────────
+  await delay(380);
+  setPipeRunning('optimize');
+  setPhase('⚡ Local Search 최적화 중 (전략당 20 iterations)...');
+  setArenaPhase('최적화');
+  addLog('optimizer: stochastic local search 시작');
+
+  genStrategies.forEach(s => {
+    const b = document.getElementById(`badge-${s.id}`);
+    if (b) { b.textContent = '⚡ 최적화 중'; b.className = 'sc-badge optimizing'; }
+  });
+
+  await delay(450);
+
+  // Match generate→optimize strategies by mode, animate bid growth
+  const optByMode = {};
+  for (const os of optStrategies) optByMode[os.mode] = os;
+  const maxOptBid = Math.max(...optStrategies.map(s => s.bid), 0.001);
+
+  for (const gs of genStrategies) {
+    const os = optByMode[gs.mode];
+    if (!os) continue;
+    const card = document.querySelector(`[data-strat-id="${gs.id}"]`);
+    if (!card) continue;
+
+    const pct = (os.bid / maxOptBid * 100).toFixed(1);
+    card.querySelector('.sc-bar').style.width = pct + '%';
+    card.querySelector(`#bv-${gs.id}`).textContent = os.bid.toFixed(4);
+
+    const delta = ((os.bid - gs.bid) / Math.max(gs.bid, 0.0001) * 100);
+    if (delta > 0) {
+      const de = card.querySelector(`#bd-${gs.id}`);
+      de.textContent = `+${delta.toFixed(1)}%`;
+      de.style.display = 'inline';
+    }
+  }
+
+  await delay(800);
+  const avgImprove = (optEv?.summary || '').match(/[\+\-][\d.]+%/)?.[0] || '+~3%';
+  addLog(`✓ 최적화 완료: 평균 ${avgImprove} 개선`);
+  setPipeDone('optimize', optEv?.duration_ms);
+
+  // ── Phase 3: CDA Auction ────────────────────────────────────
+  await delay(380);
+  setPipeRunning('auction');
+  setPhase('🏛️ CDA 경매 실행 중... (Continuous Double Auction)');
+  setArenaPhase('경매');
+  addLog(`auction: ${optStrategies.length}개 전략 입찰 시작`);
+
+  genStrategies.forEach(s => {
+    const b = document.getElementById(`badge-${s.id}`);
+    if (b) { b.textContent = '🏛️ 입찰 중'; b.className = 'sc-badge competing'; }
+  });
+
+  await delay(500);
+
+  // Show clearing price marker on bid bars
+  const clearingPrice = auctEv?.clearing_price;
+  if (clearingPrice && maxOptBid > 0) {
+    const clearPct = (clearingPrice / maxOptBid * 100).toFixed(1);
+    genStrategies.forEach(gs => {
+      const cl = document.getElementById(`cl-${gs.id}`);
+      if (cl) { cl.style.left = clearPct + '%'; cl.style.display = 'block'; }
+    });
+    await delay(500);
+    addLog(`청산가 결정: ${clearingPrice.toFixed(4)}`, 'warn');
+  }
+
+  await delay(300);
+
+  // Determine winners by matching mode to auction winners
+  const auctionWinnerModes = new Set((auctEv?.winners || []).map(w => w.mode));
+  // Fallback: if no winner data, advance top-half by bid
+  const useModeFallback = auctionWinnerModes.size === 0;
+  const sortedByBid = [...genStrategies].sort((a,b) => {
+    const oa = optByMode[a.mode]; const ob = optByMode[b.mode];
+    return (ob?.bid||0) - (oa?.bid||0);
+  });
+  const fallbackWinners = new Set(sortedByBid.slice(0, Math.ceil(genStrategies.length/2)).map(s => s.mode));
+
+  for (const gs of genStrategies) {
+    const card = document.querySelector(`[data-strat-id="${gs.id}"]`);
+    if (!card) continue;
+    const badge = document.getElementById(`badge-${gs.id}`);
+    const isWinner = useModeFallback ? fallbackWinners.has(gs.mode) : auctionWinnerModes.has(gs.mode);
+
+    if (isWinner) {
+      card.classList.add('advancing');
+      if (badge) { badge.textContent = '✓ 낙찰'; badge.className = 'sc-badge advancing'; }
+    } else {
+      card.classList.add('eliminated');
+      if (badge) { badge.textContent = '✗ 탈락'; badge.className = 'sc-badge elim'; }
+    }
+  }
+
+  const nWin = auctEv?.n_winners || auctionWinnerModes.size || fallbackWinners.size;
+  const nElim = genStrategies.length - nWin;
+  addLog(`✓ 경매 완료: ${nWin}개 낙찰 / ${nElim}개 탈락`, 'hi');
+  await delay(350);
+  setPipeDone('auction', auctEv?.duration_ms);
+
+  // ── Phase 4: MetaCritic ────────────────────────────────────
+  await delay(380);
+  setPipeRunning('critique');
+  setPhase('🧠 MetaCritic: 정책 검증 및 최적 전략 선택...');
+  setArenaPhase('MetaCritic 심사');
+  addLog('metacritic: SOC 제약 및 수출 한도 정책 검증 중');
+
+  await delay(650);
+
+  const selectedMode = critEv?.selected_mode
+    || data.selected_strategy?.metadata?.mode
+    || data.selected_strategy?.mode;
+
+  for (const gs of genStrategies) {
+    if (gs.mode === selectedMode) {
+      const card = document.querySelector(`[data-strat-id="${gs.id}"]`);
+      if (card) {
+        card.classList.remove('advancing', 'eliminated');
+        card.classList.add('winner');
+        const b = document.getElementById(`badge-${gs.id}`);
+        if (b) { b.textContent = '🏆 선택됨'; b.className = 'sc-badge winner'; }
+      }
+    }
+  }
+
+  const reward = critEv?.reward ?? data.reward ?? 0;
+  addLog(`🏆 선택: ${modeLabel(selectedMode)} (reward: ${reward.toFixed(4)})`, 'hi');
+  if (critEv?.n_filtered) addLog(`정책 위반으로 ${critEv.n_filtered}개 전략 제외`, 'warn');
+  await delay(350);
+  setPipeDone('critique', critEv?.duration_ms);
+
+  // ── Phase 5: Dispatch ──────────────────────────────────────
+  await delay(380);
+  setPipeRunning('dispatch');
+  setPhase('📡 제어 명령 전송 중...');
+  setArenaPhase('Dispatch');
+  addLog('dispatcher: 물리 setpoint 생성 중');
+
+  if (dispEv) {
+    await delay(300);
+    addLog(`→ ESS 충전 +${(dispEv.ess_charge_kw||0).toFixed(1)} kW  방전 -${(dispEv.ess_discharge_kw||0).toFixed(1)} kW`);
+    addLog(`→ Market ${(dispEv.market_quantity_kw||0).toFixed(1)} kW  PV감발 ${(dispEv.pv_curtailment_pct||0).toFixed(0)}%`);
+  }
+
+  await delay(500);
+  setPipeDone('dispatch', dispEv?.duration_ms);
+
+  // ── Done ──────────────────────────────────────────────────
+  await delay(400);
+  setPhase('✅ 최적화 완료!');
+  setArenaPhase('완료');
+  addLog('에이전트 워크플로우 완료', 'hi');
+
+  // Strategy change detection
+  const prevMode = lastSelectedMode;
+  lastSelectedMode = selectedMode;
+
+  let changeText, changeColor;
+  if (!prevMode) {
+    changeText = '첫 실행';
+    changeColor = 'var(--muted)';
+  } else if (prevMode === selectedMode) {
+    changeText = `${modeEmoji(selectedMode)} 동일 전략 유지`;
+    changeColor = 'var(--muted)';
+  } else {
+    changeText = `${modeEmoji(prevMode)} → ${modeEmoji(selectedMode)} 전략 변경!`;
+    changeColor = 'var(--amber)';
+    addLog(`⚡ 전략 변경: ${modeLabel(prevMode)} → ${modeLabel(selectedMode)}`, 'warn');
+    // Show banner on main dashboard
+    const banner = document.getElementById('stratChangeBanner');
+    document.getElementById('stratChangeBannerText').textContent =
+      `전략 변경: ${modeEmoji(prevMode)} ${modeLabel(prevMode)} → ${modeEmoji(selectedMode)} ${modeLabel(selectedMode)}`;
+    banner.classList.add('visible');
+    setTimeout(() => banner.classList.remove('visible'), 8000);
+  }
+
+  // Show result footer
+  document.getElementById('aoResMode').textContent   = `${modeEmoji(selectedMode)} ${modeLabel(selectedMode)}`;
+  document.getElementById('aoResReward').textContent = reward.toFixed(4);
+  document.getElementById('aoResChange').textContent = changeText;
+  document.getElementById('aoResChange').style.color = changeColor;
+
+  const footer = document.getElementById('aoFooter');
+  footer.style.display = 'flex';
 }
 
 // ─────────────────────────────────────────────────────────────────────
