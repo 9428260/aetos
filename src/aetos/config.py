@@ -9,6 +9,21 @@ class Settings(BaseSettings):
     interval_seconds: int = 300  # execution loop interval
     log_level: str = "INFO"
 
+    # LLM / embedding providers
+    azure_openai_endpoint: str = ""
+    azure_openai_api_key: str = ""
+    azure_openai_deployment: str = ""
+    azure_openai_api_version: str = ""
+    azure_openai_embedding_deployment: str = ""
+    openai_embedding_model: str = ""
+
+    # Weather integration
+    openweather_api_key: str = ""
+    openweather_city: str = "Seoul"
+    openweather_lat: float = 37.5665
+    openweather_lon: float = 126.9780
+    openweather_units: str = "metric"
+
     # Reward weights
     w1_cost_saving: float = 0.30
     w2_solar_roi: float = 0.20
