@@ -2,7 +2,7 @@
 
 import pytest
 
-from aetos.state import EnergyState
+from aetos.state import Constraints, EnergyState
 
 from .factories import ScenarioFactory, make_state, make_strategy_fixture
 
@@ -10,6 +10,17 @@ from .factories import ScenarioFactory, make_state, make_strategy_fixture
 # ─────────────────────────────────────────────────────────────────────────────
 # EnergyState fixtures
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture()
+def sample_state() -> EnergyState:
+    return EnergyState(
+        price=[0.05, 0.06, 0.12, 0.15, 0.10, 0.07] * 4,
+        load=[25.0, 30.0, 40.0, 45.0, 35.0, 20.0] * 4,
+        generation=[0.0, 0.0, 5.0, 20.0, 30.0, 10.0] * 4,
+        ess_soc=0.5,
+        constraints=Constraints(export_limit=50.0, soc_min=0.1, soc_max=0.9),
+    )
 
 
 @pytest.fixture()

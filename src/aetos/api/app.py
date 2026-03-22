@@ -3,14 +3,20 @@
 Endpoints:
   GET  /              – dashboard UI
   POST /run           – trigger one optimization cycle
+  POST /chat          – natural language interface (deepagents)
   GET  /kpi           – cumulative KPI totals
   GET  /episodes      – recent episode history
   GET  /episodes/{id} – full workflow trace for one episode
   GET  /health        – liveness probe
+  GET  /a2a/agents    – registered A2A agent cards
+  GET  /mcp/tools     – MCP tool definitions (discovery)
+  GET  /mcp/sse       – MCP SSE transport (external MCP clients)
+  POST /mcp/messages/ – MCP SSE message endpoint
 """
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import logging
 import random
 import uuid
@@ -20,8 +26,9 @@ from pathlib import Path
 from typing import Annotated
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import desc, func, select
@@ -30,6 +37,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db.history import persist_workflow_run
 from ..db.models import Episode, KPI
 from ..db.session import AsyncSessionLocal, get_session, init_db
+from ..config import settings
+from ..deep_agent import (
+    DeepAgentConfigurationError,
+    DeepAgentExecutionError,
+    DeepAgentInputError,
+    DeepAgentRateLimitError,
+    invoke_deep_agent,
+)
+from ..mcp.server import mcp as _mcp_server
+from ..observability import audit_log, metrics, new_request_id, set_request_context, timed
+from ..runtime import runtime
+from ..security import authorize_request
 from ..state import Constraints, EnergyState
 from ..workflow import get_agent_cards, run_workflow
 
@@ -37,29 +56,35 @@ logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
-app = FastAPI(
-    title="AETOS",
-    description="Autonomous Agentic Energy Trading & Optimization System",
-    version="0.1.0",
-)
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# In-memory fallback store (when PostgreSQL is unavailable)
-_mem_episodes: deque[dict] = deque(maxlen=200)
-
-
-# ---------------------------------------------------------------------------
-# Startup
-# ---------------------------------------------------------------------------
-
-
-@app.on_event("startup")
-async def on_startup() -> None:
+@asynccontextmanager
+async def lifespan(_: FastAPI):
     try:
         await init_db()
         logger.info("AETOS API started (PostgreSQL connected)")
     except Exception as e:
         logger.warning("DB unavailable – running in memory-only mode: %s", e)
+    yield
+
+
+app = FastAPI(
+    title="AETOS",
+    description="Autonomous Agentic Energy Trading & Optimization System",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in settings.cors_allow_origins.split(",") if o.strip()] or ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/mcp", _mcp_server.sse_app())  # MCP SSE transport for external clients
+
+# In-memory fallback store (when PostgreSQL is unavailable)
+_mem_episodes: deque[dict] = deque(maxlen=200)
 
 
 # ---------------------------------------------------------------------------
@@ -118,9 +143,53 @@ class KPIResponse(BaseModel):
     n_episodes: int
 
 
+class ChatRequest(BaseModel):
+    message: str
+
+
+class ChatResponse(BaseModel):
+    reply: str
+
+
 # ---------------------------------------------------------------------------
-# Helpers
+# Middleware / Helpers
 # ---------------------------------------------------------------------------
+
+
+@app.middleware("http")
+async def ops_middleware(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or new_request_id()
+    path = request.url.path
+
+    try:
+        auth = authorize_request(request)
+        set_request_context(request_id=request_id, actor=auth.actor, scope=auth.scope)
+    except HTTPException as exc:
+        set_request_context(request_id=request_id, actor="anonymous", scope="denied")
+        metrics.incr("http.denied")
+        audit_log(
+            "http.denied",
+            path=path,
+            method=request.method,
+            status_code=exc.status_code,
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers={"x-request-id": request_id},
+        )
+
+    try:
+        with timed("http.request", audit_event="http.request", path=path, method=request.method):
+            response = await call_next(request)
+    except Exception:
+        metrics.incr("http.error")
+        audit_log("http.error", path=path, method=request.method)
+        raise
+
+    metrics.incr(f"http.status.{response.status_code}")
+    response.headers["x-request-id"] = request_id
+    return response
 
 
 def _mock_state() -> EnergyState:
@@ -199,6 +268,46 @@ async def health() -> dict:
 @app.get("/a2a/agents")
 async def a2a_agents() -> list[dict]:
     return get_agent_cards()
+
+
+@app.get("/a2a/policy")
+async def a2a_policy() -> dict:
+    return runtime.a2a_policy()
+
+
+@app.get("/metrics")
+async def get_metrics() -> dict:
+    return metrics.snapshot()
+
+
+@app.get("/mcp/tools")
+async def mcp_tools() -> list[dict]:
+    """등록된 MCP 도구 목록과 스키마를 반환합니다 (discovery)."""
+    tools = await _mcp_server.list_tools()
+    return [
+        {
+            "name": t.name,
+            "description": t.description,
+            "inputSchema": t.inputSchema,
+        }
+        for t in tools
+    ]
+
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(body: ChatRequest) -> ChatResponse:
+    """deepagents deep agent를 통해 자연어로 에너지 최적화를 요청합니다."""
+    try:
+        reply = await invoke_deep_agent(body.message)
+    except DeepAgentInputError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except DeepAgentConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except DeepAgentRateLimitError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except DeepAgentExecutionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return ChatResponse(reply=reply)
 
 
 @app.post("/run", response_model=RunResponse)

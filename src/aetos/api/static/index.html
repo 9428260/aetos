@@ -33,6 +33,24 @@ header {
 .logo h1 { font-size: 18px; font-weight: 700; letter-spacing: .5px; }
 .logo span { font-size: 22px; }
 .header-right { display: flex; align-items: center; gap: 16px; }
+.header-tools {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  background: var(--card2); border: 1px solid var(--border); border-radius: 10px;
+}
+.api-key-wrap { display: flex; align-items: center; gap: 6px; }
+.api-key-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.api-key-input {
+  width: 220px; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  font-size: 12px; outline: none;
+}
+.api-key-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-dim); }
+.api-key-btn {
+  padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+  background: transparent; color: var(--text); cursor: pointer; font-size: 11px; font-weight: 700;
+}
+.api-key-btn:hover { border-color: var(--primary); color: var(--primary); }
+.api-key-hint { font-size: 10px; color: var(--muted); white-space: nowrap; }
 .badge-live { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
   background: var(--primary-dim); color: var(--primary); border: 1px solid var(--primary);
   display: flex; align-items: center; gap: 5px; }
@@ -344,12 +362,17 @@ header .meta { color: var(--muted); font-size: 12px; }
   .main { grid-template-columns: 1fr; }
   .kpi-bar { grid-template-columns: repeat(2, 1fr); }
   .header-right { gap: 10px; }
+  .header-tools { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+  .api-key-input { width: 180px; }
 }
 
 @media (max-width: 640px) {
   header { padding: 14px 16px; }
   .main { padding: 16px; }
   .header-right { flex-direction: column; align-items: flex-end; gap: 6px; }
+  .header-tools { align-items: stretch; }
+  .api-key-wrap { width: 100%; }
+  .api-key-input { width: 100%; }
   .kpi-bar { grid-template-columns: 1fr; }
 }
 
@@ -516,6 +539,15 @@ header .meta { color: var(--muted); font-size: 12px; }
     </div>
   </div>
   <div class="header-right">
+    <div class="header-tools">
+      <div class="api-key-wrap">
+        <span class="api-key-label">API Key</span>
+        <input id="apiKeyInput" class="api-key-input" type="password" placeholder="write key 입력" autocomplete="off">
+        <button class="api-key-btn" onclick="saveApiKey()">저장</button>
+        <button class="api-key-btn" onclick="clearApiKey()">지우기</button>
+      </div>
+      <div class="api-key-hint" id="apiTargetHint">API: —</div>
+    </div>
     <div id="statusBadge" class="badge-live">
       <span class="dot"></span><span id="statusText">IDLE</span>
     </div>
@@ -985,6 +1017,7 @@ function modeEmoji(mode) { return MODE_EMOJIS[mode] || '●'; }
 // Init
 // ─────────────────────────────────────────────────────────────────────
 async function init() {
+  syncApiControls();
   initEnergyChart([]);
   initStrategyChart([]);
   initDecompChart({});
@@ -1013,17 +1046,16 @@ async function runOptimization() {
 
   let runData = null;
   try {
-    const res = await fetch('/run', {
+    runData = await apiFetchJson('/run', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({goal: 'optimize'}),
     });
-    runData = await res.json();
 
     // Update header timestamp
     const ts = new Date(runData.timestamp);
     document.getElementById('lastRunMeta').textContent =
-      `최근 실행: ${ts.toLocaleTimeString('ko-KR')}  │  Reward: ${runData.reward.toFixed(4)}`;
+      `최근 실행: ${ts.toLocaleTimeString('ko-KR')}  │  Reward: ${fixed(runData.reward, 4, '0.0000')}`;
 
     // Run overlay animation (awaited — button stays disabled until animation completes)
     await animateAgentRun(runData);
@@ -1031,7 +1063,12 @@ async function runOptimization() {
   } catch(e) {
     console.error(e);
     closeAgentOverlay();
-    alert('실행 오류: ' + e.message);
+    if (String(e.message || '').includes("scope 'write'")) {
+      alert('실행 오류: API 키가 필요합니다. 브라우저 콘솔에서 localStorage.setItem("aetos_api_key", "YOUR_WRITE_KEY") 후 다시 시도해 주세요.');
+    } else {
+      alert('실행 오류: ' + e.message);
+    }
+    runData = null;
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<span>▶</span> RUN NOW';
@@ -1053,7 +1090,7 @@ async function runOptimization() {
     if (runData.reward_decomposition) {
       updateDecomposition(runData.reward_decomposition);
     }
-    await animateWorkflowSteps(runData.step_events);
+    await animateWorkflowSteps(runData.step_events || []);
     await loadKPI();
     await loadEpisodes();
   }
@@ -1067,6 +1104,7 @@ function clearWorkflowSteps() {
 }
 
 async function animateWorkflowSteps(stepEvents) {
+  if (!Array.isArray(stepEvents) || !stepEvents.length) return;
   const container = document.getElementById('workflowSteps');
   for (let i = 0; i < stepEvents.length; i++) {
     await delay(220);
@@ -1093,7 +1131,7 @@ function buildStepEl(ev, idx) {
     </div>`;
   } else if (ev.node === 'optimize') {
     const bids = (ev.strategies || []).map(s => s.bid);
-    const best = bids.length ? Math.max(...bids).toFixed(4) : '?';
+    const best = bids.length ? fixed(Math.max(...bids), 4, '?') : '?';
     metricsHtml = `<div class="step-metrics">
       <div class="metric"><span class="mk">최고 bid</span><span class="mv">${best}</span></div>
       <div class="metric"><span class="mk">개선됨</span><span class="mv">${ev.strategies?.length ?? '?'}개</span></div>
@@ -1108,16 +1146,16 @@ function buildStepEl(ev, idx) {
     const decomp = ev.reward_decomposition || {};
     metricsHtml = `<div class="step-metrics">
       <div class="metric"><span class="mk">전략 모드</span><span class="mv">${ev.selected_mode ?? '?'}</span></div>
-      <div class="metric"><span class="mk">Reward</span><span class="mv">${(ev.reward ?? 0).toFixed(4)}</span></div>
+      <div class="metric"><span class="mk">Reward</span><span class="mv">${fixed(ev.reward, 4, '0.0000')}</span></div>
       <div class="metric"><span class="mk">필터 제거</span><span class="mv">${ev.n_filtered ?? 0}개</span></div>
     </div>`;
   } else if (ev.node === 'dispatch') {
     if (ev.status === 'done') {
       metricsHtml = `<div class="step-metrics">
-        <div class="metric"><span class="mk">ESS 충전</span><span class="mv">+${ev.ess_charge_kw?.toFixed(1) ?? 0} kW</span></div>
-        <div class="metric"><span class="mk">ESS 방전</span><span class="mv">−${ev.ess_discharge_kw?.toFixed(1) ?? 0} kW</span></div>
-        <div class="metric"><span class="mk">Market</span><span class="mv">${ev.market_quantity_kw?.toFixed(1) ?? 0} kW</span></div>
-        <div class="metric"><span class="mk">PV 감발</span><span class="mv">${ev.pv_curtailment_pct?.toFixed(0) ?? 0}%</span></div>
+        <div class="metric"><span class="mk">ESS 충전</span><span class="mv">+${fixed(ev.ess_charge_kw, 1, '0.0')} kW</span></div>
+        <div class="metric"><span class="mk">ESS 방전</span><span class="mv">−${fixed(ev.ess_discharge_kw, 1, '0.0')} kW</span></div>
+        <div class="metric"><span class="mk">Market</span><span class="mv">${fixed(ev.market_quantity_kw, 1, '0.0')} kW</span></div>
+        <div class="metric"><span class="mk">PV 감발</span><span class="mv">${fixed(ev.pv_curtailment_pct, 0, '0')}%</span></div>
       </div>`;
     }
   }
@@ -1221,7 +1259,7 @@ function initStrategyChart() {
       indexAxis: 'y', responsive: true, maintainAspectRatio: false,
       animation: { duration: 600 },
       plugins: { legend: { display: false }, tooltip: {
-        callbacks: { label: ctx => ` bid: ${ctx.raw.toFixed(4)}` }
+        callbacks: { label: ctx => ` bid: ${fixed(ctx.raw, 4, '0.0000')}` }
       }},
       scales: {
         x: { grid: { color: '#1e2d4a' }, ticks: { color: '#64748b' } },
@@ -1280,7 +1318,7 @@ function initDecompChart() {
     options: {
       responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
       plugins: { legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.raw.toFixed(4)}` } } },
+        tooltip: { callbacks: { label: ctx => ` ${fixed(ctx.raw, 4, '0.0000')}` } } },
       scales: {
         x: { stacked: false, grid: { color: '#1e2d4a' }, ticks: { color: '#64748b', font:{size:10} } },
         y: { grid: { color: '#1e2d4a' }, ticks: { color: '#64748b' } },
@@ -1304,7 +1342,7 @@ function updateDecomposition(decomp) {
       <div class="decomp-bar-wrap">
         <div class="decomp-bar ${cls}" style="width:${pct}%"></div>
       </div>
-      <div class="decomp-value ${cls}">${sign}${val.toFixed(4)}</div>
+      <div class="decomp-value ${cls}">${sign}${fixed(val, 4, '0.0000')}</div>
     </div>`;
   }).join('');
 
@@ -1389,10 +1427,10 @@ function updateEpisodeTable() {
       <td style="color:var(--muted)">${i+1}</td>
       <td style="color:var(--muted);font-size:11px">${ts}</td>
       <td><span class="mode-badge" style="background:${modeColor(mode)}22;color:${modeColor(mode)};border-color:${modeColor(mode)}">${mode.replace(/_/g,' ')}</span></td>
-      <td style="color:var(--primary);font-weight:600">${(ep.reward??0).toFixed(4)}</td>
-      <td>${(ep.cost_saving??0).toFixed(4)}</td>
-      <td>${(ep.ess_profit??0).toFixed(4)}</td>
-      <td>${(ep.roi??0).toFixed(4)}</td>
+      <td style="color:var(--primary);font-weight:600">${fixed(ep.reward, 4, '0.0000')}</td>
+      <td>${fixed(ep.cost_saving, 4, '0.0000')}</td>
+      <td>${fixed(ep.ess_profit, 4, '0.0000')}</td>
+      <td>${fixed(ep.roi, 4, '0.0000')}</td>
     </tr>`;
   }).join('');
 }
@@ -1402,11 +1440,11 @@ function updateEpisodeTable() {
 // ─────────────────────────────────────────────────────────────────────
 async function loadKPI() {
   try {
-    const data = await fetch('/kpi').then(r => r.json());
+    const data = await apiFetchJson('/kpi');
     document.getElementById('kpiCostSaving').textContent  = fmt$(data.cost_saving);
     document.getElementById('kpiEssProfit').textContent   = fmt$(data.ess_profit);
     document.getElementById('kpiRoi').textContent         = fmt$(data.roi);
-    document.getElementById('kpiAvgReward').textContent   = (data.avg_reward ?? 0).toFixed(4);
+    document.getElementById('kpiAvgReward').textContent   = fixed(data.avg_reward, 4, '0.0000');
     document.getElementById('kpiEpisodes').textContent    = `${data.n_episodes} 에피소드`;
     document.getElementById('kpiCostSavingSub').textContent = `누적 ${fmt$(data.cost_saving)}`;
   } catch(e) { console.warn('KPI load failed', e); }
@@ -1414,7 +1452,7 @@ async function loadKPI() {
 
 async function loadEpisodes() {
   try {
-    episodes = await fetch('/episodes?limit=100').then(r => r.json());
+    episodes = await apiFetchJson('/episodes?limit=100');
     updateEpisodeTable();
     updateTrendChart();
   } catch(e) { console.warn('Episodes load failed', e); }
@@ -1424,9 +1462,119 @@ async function loadEpisodes() {
 // Utilities
 // ─────────────────────────────────────────────────────────────────────
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+function num(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+function fixed(v, digits = 2, fallback = '0') {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(digits) : fallback;
+}
 function fmt$(v) {
-  const n = parseFloat(v) || 0;
-  return '$' + n.toFixed(2);
+  return '$' + fixed(v, 2, '0.00');
+}
+function getApiBase() {
+  try {
+    const qs = new URLSearchParams(window.location.search);
+    const queryBase = qs.get('api');
+    if (queryBase) {
+      localStorage.setItem('aetos_api_base', queryBase);
+      return queryBase;
+    }
+  } catch (_) {}
+  try {
+    const saved = localStorage.getItem('aetos_api_base');
+    if (saved) return saved;
+  } catch (_) {}
+  if (window.location?.origin && window.location.origin !== 'null') {
+    return window.location.origin;
+  }
+  return 'http://127.0.0.1:8000';
+}
+function getApiKey() {
+  try {
+    const qs = new URLSearchParams(window.location.search);
+    const queryKey = qs.get('api_key');
+    if (queryKey) {
+      localStorage.setItem('aetos_api_key', queryKey);
+      return queryKey;
+    }
+  } catch (_) {}
+  try { return localStorage.getItem('aetos_api_key') || ''; }
+  catch (_) { return ''; }
+}
+function maskKey(value) {
+  if (!value) return 'not set';
+  if (value.length <= 6) return 'set';
+  return `${value.slice(0, 3)}***${value.slice(-2)}`;
+}
+function syncApiControls() {
+  const input = document.getElementById('apiKeyInput');
+  const hint = document.getElementById('apiTargetHint');
+  const base = getApiBase();
+  const key = getApiKey();
+  if (input && !input.dataset.dirty) input.value = key;
+  if (hint) hint.textContent = `API: ${base}  │  KEY: ${maskKey(key)}`;
+}
+function saveApiKey() {
+  const input = document.getElementById('apiKeyInput');
+  const value = input?.value?.trim() || '';
+  try { localStorage.setItem('aetos_api_key', value); } catch (_) {}
+  if (input) input.dataset.dirty = '';
+  syncApiControls();
+  alert(value ? 'API 키를 저장했습니다.' : '빈 값으로 저장되었습니다.');
+}
+function clearApiKey() {
+  try { localStorage.removeItem('aetos_api_key'); } catch (_) {}
+  const input = document.getElementById('apiKeyInput');
+  if (input) {
+    input.value = '';
+    input.dataset.dirty = '';
+  }
+  syncApiControls();
+  alert('API 키를 제거했습니다.');
+}
+document.addEventListener('input', (e) => {
+  if (e.target && e.target.id === 'apiKeyInput') {
+    e.target.dataset.dirty = '1';
+  }
+});
+function buildApiHeaders(extra = {}) {
+  const headers = { 'Accept': 'application/json', ...extra };
+  const apiKey = getApiKey();
+  if (apiKey) headers['x-api-key'] = apiKey;
+  return headers;
+}
+async function apiFetchJson(path, options = {}) {
+  const controller = new AbortController();
+  const timeoutMs = options.timeoutMs ?? 15000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(new URL(path, getApiBase()), {
+      ...options,
+      headers: buildApiHeaders(options.headers || {}),
+      signal: controller.signal,
+    });
+    const text = await res.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; }
+    catch (_) { data = { raw: text }; }
+    if (!res.ok) {
+      const detail = data?.detail || data?.raw || `HTTP ${res.status}`;
+      throw new Error(detail);
+    }
+    return data;
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error('요청 시간이 초과되었습니다. 서버 상태를 확인해 주세요.');
+    }
+    if (e instanceof TypeError) {
+      throw new Error('서버에 연결할 수 없습니다. API 서버가 실행 중인지 확인해 주세요.');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -1502,7 +1650,7 @@ function addLog(msg, type = '') {
 
 function buildStrategyCard(strategy, maxBid) {
   const color = modeColor(strategy.mode);
-  const bidPct = maxBid > 0 ? (strategy.bid / maxBid * 100).toFixed(1) : 50;
+  const bidPct = maxBid > 0 ? fixed(num(strategy.bid) / maxBid * 100, 1, '50.0') : 50;
   const div = document.createElement('div');
   div.className = 'sc';
   div.dataset.stratId = strategy.id;
@@ -1560,9 +1708,9 @@ async function animateAgentRun(data) {
     await delay(20);
     card.classList.add('visible');
     await delay(60);
-    const pct = (s.bid / maxInitBid * 100).toFixed(1);
+    const pct = fixed(num(s.bid) / maxInitBid * 100, 1, '0.0');
     card.querySelector('.sc-bar').style.width = pct + '%';
-    card.querySelector(`#bv-${s.id}`).textContent = s.bid.toFixed(4);
+    card.querySelector(`#bv-${s.id}`).textContent = fixed(s.bid, 4, '0.0000');
   }
 
   addLog(`✓ ${genStrategies.length}개 전략 후보 생성 완료`);
@@ -1594,14 +1742,14 @@ async function animateAgentRun(data) {
     const card = document.querySelector(`[data-strat-id="${gs.id}"]`);
     if (!card) continue;
 
-    const pct = (os.bid / maxOptBid * 100).toFixed(1);
+    const pct = fixed(num(os.bid) / maxOptBid * 100, 1, '0.0');
     card.querySelector('.sc-bar').style.width = pct + '%';
-    card.querySelector(`#bv-${gs.id}`).textContent = os.bid.toFixed(4);
+    card.querySelector(`#bv-${gs.id}`).textContent = fixed(os.bid, 4, '0.0000');
 
     const delta = ((os.bid - gs.bid) / Math.max(gs.bid, 0.0001) * 100);
     if (delta > 0) {
       const de = card.querySelector(`#bd-${gs.id}`);
-      de.textContent = `+${delta.toFixed(1)}%`;
+      de.textContent = `+${fixed(delta, 1, '0.0')}%`;
       de.style.display = 'inline';
     }
   }
@@ -1628,13 +1776,13 @@ async function animateAgentRun(data) {
   // Show clearing price marker on bid bars
   const clearingPrice = auctEv?.clearing_price;
   if (clearingPrice && maxOptBid > 0) {
-    const clearPct = (clearingPrice / maxOptBid * 100).toFixed(1);
+    const clearPct = fixed(num(clearingPrice) / maxOptBid * 100, 1, '0.0');
     genStrategies.forEach(gs => {
       const cl = document.getElementById(`cl-${gs.id}`);
       if (cl) { cl.style.left = clearPct + '%'; cl.style.display = 'block'; }
     });
     await delay(500);
-    addLog(`청산가 결정: ${clearingPrice.toFixed(4)}`, 'warn');
+    addLog(`청산가 결정: ${fixed(clearingPrice, 4, '0.0000')}`, 'warn');
   }
 
   await delay(300);
@@ -1696,7 +1844,7 @@ async function animateAgentRun(data) {
   }
 
   const reward = critEv?.reward ?? data.reward ?? 0;
-  addLog(`🏆 선택: ${modeLabel(selectedMode)} (reward: ${reward.toFixed(4)})`, 'hi');
+  addLog(`🏆 선택: ${modeLabel(selectedMode)} (reward: ${fixed(reward, 4, '0.0000')})`, 'hi');
   if (critEv?.n_filtered) addLog(`정책 위반으로 ${critEv.n_filtered}개 전략 제외`, 'warn');
   await delay(350);
   setPipeDone('critique', critEv?.duration_ms);
@@ -1710,8 +1858,8 @@ async function animateAgentRun(data) {
 
   if (dispEv) {
     await delay(300);
-    addLog(`→ ESS 충전 +${(dispEv.ess_charge_kw||0).toFixed(1)} kW  방전 -${(dispEv.ess_discharge_kw||0).toFixed(1)} kW`);
-    addLog(`→ Market ${(dispEv.market_quantity_kw||0).toFixed(1)} kW  PV감발 ${(dispEv.pv_curtailment_pct||0).toFixed(0)}%`);
+    addLog(`→ ESS 충전 +${fixed(dispEv.ess_charge_kw, 1, '0.0')} kW  방전 -${fixed(dispEv.ess_discharge_kw, 1, '0.0')} kW`);
+    addLog(`→ Market ${fixed(dispEv.market_quantity_kw, 1, '0.0')} kW  PV감발 ${fixed(dispEv.pv_curtailment_pct, 0, '0')}%`);
   }
 
   await delay(500);
@@ -1748,7 +1896,7 @@ async function animateAgentRun(data) {
 
   // Show result footer
   document.getElementById('aoResMode').textContent   = `${modeEmoji(selectedMode)} ${modeLabel(selectedMode)}`;
-  document.getElementById('aoResReward').textContent = reward.toFixed(4);
+  document.getElementById('aoResReward').textContent = fixed(reward, 4, '0.0000');
   document.getElementById('aoResChange').textContent = changeText;
   document.getElementById('aoResChange').style.color = changeColor;
 
@@ -1785,7 +1933,7 @@ async function showHistory(e) {
 
 async function loadHistoryEpisodes() {
   try {
-    _histAllEpisodes = await fetch('/episodes?limit=200').then(r => r.json());
+    _histAllEpisodes = await apiFetchJson('/episodes?limit=200');
   } catch(e) {
     _histAllEpisodes = episodes.slice(); // fallback to dashboard data
   }
@@ -1873,7 +2021,7 @@ function renderHistoryTable() {
         <td style="font-size:11px;color:var(--muted)">${ts}</td>
         <td><span class="source-badge ${srcClass}">${ep.source || 'api'}</span></td>
         <td><span class="mode-badge" style="background:${modeColor(mode)}22;color:${modeColor(mode)};border-color:${modeColor(mode)}">${modeEmoji(mode)} ${mode.replace(/_/g,' ')}</span></td>
-        <td style="color:var(--primary);font-weight:600">${(ep.reward??0).toFixed(4)}</td>
+        <td style="color:var(--primary);font-weight:600">${fixed(ep.reward, 4, '0.0000')}</td>
         <td>${fmt$(ep.cost_saving)}</td>
         <td>${fmt$(ep.ess_profit)}</td>
         <td>${fmt$(ep.roi)}</td>
@@ -1914,10 +2062,7 @@ async function openEpisodeDetail(id) {
   document.getElementById('epDecompList').innerHTML  = '<div class="empty-state"><span class="spinner"></span></div>';
 
   try {
-    const ep = await fetch(`/episodes/${id}`).then(r => {
-      if (!r.ok) throw new Error('not found');
-      return r.json();
-    });
+    const ep = await apiFetchJson(`/episodes/${id}`);
     renderEpisodeDetail(ep);
   } catch(e) {
     document.getElementById('epDetailTitle').textContent = '불러오기 실패';
@@ -1940,7 +2085,7 @@ function renderEpisodeDetail(ep) {
     `${ts}  │  소스: ${ep.source || 'api'}  │  ID: ${ep.id}`;
 
   // KPI
-  document.getElementById('epKpiReward').textContent = (ep.reward ?? 0).toFixed(4);
+  document.getElementById('epKpiReward').textContent = fixed(ep.reward, 4, '0.0000');
   document.getElementById('epKpiCost').textContent   = fmt$(ep.cost_saving);
   document.getElementById('epKpiEss').textContent    = fmt$(ep.ess_profit);
   document.getElementById('epKpiRoi').textContent    = fmt$(ep.roi);
@@ -1955,12 +2100,12 @@ function renderEpisodeDetail(ep) {
   const price = st.price || [];
   const load  = st.load  || [];
   const gen   = st.generation || [];
-  document.getElementById('epStatePrice').textContent    = price[0] != null ? `$${price[0].toFixed(4)}/kWh` : '—';
-  document.getElementById('epStateLoad').textContent     = load[0]  != null ? `${load[0].toFixed(1)} kW` : '—';
-  document.getElementById('epStateGen').textContent      = gen[0]   != null ? `${gen[0].toFixed(1)} kW` : '—';
-  document.getElementById('epStatePriceMax').textContent = price.length ? `$${Math.max(...price).toFixed(4)}/kWh` : '—';
-  document.getElementById('epStateLoadMax').textContent  = load.length  ? `${Math.max(...load).toFixed(1)} kW` : '—';
-  document.getElementById('epStateGenMax').textContent   = gen.length   ? `${Math.max(...gen).toFixed(1)} kW` : '—';
+  document.getElementById('epStatePrice').textContent    = price[0] != null ? `$${fixed(price[0], 4, '0.0000')}/kWh` : '—';
+  document.getElementById('epStateLoad').textContent     = load[0]  != null ? `${fixed(load[0], 1, '0.0')} kW` : '—';
+  document.getElementById('epStateGen').textContent      = gen[0]   != null ? `${fixed(gen[0], 1, '0.0')} kW` : '—';
+  document.getElementById('epStatePriceMax').textContent = price.length ? `$${fixed(Math.max(...price), 4, '0.0000')}/kWh` : '—';
+  document.getElementById('epStateLoadMax').textContent  = load.length  ? `${fixed(Math.max(...load), 1, '0.0')} kW` : '—';
+  document.getElementById('epStateGenMax').textContent   = gen.length   ? `${fixed(Math.max(...gen), 1, '0.0')} kW` : '—';
 
   // Action
   const act = ep.action || {};
@@ -1981,31 +2126,31 @@ function renderEpisodeDetail(ep) {
       </div>
       <div class="ep-action-item">
         <div class="ep-action-label">Bid</div>
-        <div class="ep-action-value">${(act.bid ?? 0).toFixed(4)}</div>
+        <div class="ep-action-value">${fixed(act.bid, 4, '0.0000')}</div>
       </div>
       <div class="ep-action-item">
         <div class="ep-action-label">ESS 충전</div>
-        <div class="ep-action-value">${(ess.charge_rate ?? 0).toFixed(2)} kW</div>
+        <div class="ep-action-value">${fixed(ess.charge_rate, 2, '0.00')} kW</div>
       </div>
       <div class="ep-action-item">
         <div class="ep-action-label">ESS 방전</div>
-        <div class="ep-action-value">${(ess.discharge_rate ?? 0).toFixed(2)} kW</div>
+        <div class="ep-action-value">${fixed(ess.discharge_rate, 2, '0.00')} kW</div>
       </div>
       <div class="ep-action-item">
         <div class="ep-action-label">PV 감발</div>
-        <div class="ep-action-value">${((pv.curtailment_ratio ?? 0) * 100).toFixed(1)}%</div>
+        <div class="ep-action-value">${fixed(num(pv.curtailment_ratio) * 100, 1, '0.0')}%</div>
       </div>
       <div class="ep-action-item">
         <div class="ep-action-label">부하 이동</div>
-        <div class="ep-action-value">${(load2.shift_amount ?? 0).toFixed(2)} kW</div>
+        <div class="ep-action-value">${fixed(load2.shift_amount, 2, '0.00')} kW</div>
       </div>
       <div class="ep-action-item">
         <div class="ep-action-label">시장 수량</div>
-        <div class="ep-action-value">${(mkt.quantity ?? 0).toFixed(2)} kW</div>
+        <div class="ep-action-value">${fixed(mkt.quantity, 2, '0.00')} kW</div>
       </div>
       <div class="ep-action-item">
         <div class="ep-action-label">시장 가격</div>
-        <div class="ep-action-value">$${(mkt.price ?? 0).toFixed(4)}</div>
+        <div class="ep-action-value">$${fixed(mkt.price, 4, '0.0000')}</div>
       </div>
     `;
   }
@@ -2057,7 +2202,7 @@ function renderEpisodeDetail(ep) {
         <div class="decomp-bar-wrap">
           <div class="decomp-bar ${cls}" style="width:${pct}%"></div>
         </div>
-        <div class="decomp-value ${cls}">${sign}${val.toFixed(4)}</div>
+        <div class="decomp-value ${cls}">${sign}${fixed(val, 4, '0.0000')}</div>
       </div>`;
     }).join('');
   }

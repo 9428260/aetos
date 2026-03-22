@@ -120,7 +120,12 @@ class DispatcherA2A:
             raise A2AProtocolError(f"unsupported skill '{task.skill}'")
         energy = EnergyState.model_validate(task.input["energy_state"])
         strategy = Strategy.model_validate(task.input["strategy"])
-        action = self._agent.dispatch(energy, strategy)
+        action = self._agent.dispatch(
+            energy,
+            strategy,
+            dry_run=bool(task.input.get("dry_run", True)),
+            idempotency_key=task.input.get("idempotency_key"),
+        )
         return _result(
             task,
             artifact_name="dispatch",

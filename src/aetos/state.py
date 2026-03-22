@@ -75,6 +75,7 @@ class WorkflowState(TypedDict):
     """
 
     energy_state: EnergyState
+    services: dict[str, Any]
     strategies: list[Strategy]        # produced by StrategyGenerator
     optimized: list[Strategy]         # produced by Optimizer
     selected: Optional[Strategy]      # produced by MetaCritic (after CDA)

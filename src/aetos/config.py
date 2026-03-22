@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     interval_seconds: int = 300  # execution loop interval
     log_level: str = "INFO"
+    api_read_keys: str = ""
+    api_write_keys: str = ""
+    api_admin_keys: str = ""
+    cors_allow_origins: str = "*"
 
     # LLM / embedding providers
     azure_openai_endpoint: str = ""
@@ -39,6 +43,17 @@ class Settings(BaseSettings):
 
     # Optimizer
     optimizer_iterations: int = 20
+    dispatch_live_enabled: bool = False
+    dispatch_require_idempotency_key: bool = True
+    dispatch_max_power_kw: float = 100.0
+    dispatch_max_market_price: float = 1.0
+    a2a_transport: str = "local"
+    a2a_remote_endpoint: str = ""
+    a2a_remote_timeout_seconds: float = 5.0
+    deep_agent_timeout_seconds: float = 20.0
+    deep_agent_max_concurrency: int = 4
+    deep_agent_requests_per_minute: int = 30
+    deep_agent_fallback_mode: str = "workflow"
 
 
 settings = Settings()

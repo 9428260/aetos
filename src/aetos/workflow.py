@@ -15,25 +15,10 @@ import time
 
 from langgraph.graph import END, StateGraph
 
-from .a2a import build_local_broker
-from .agents.critic import MetaCritic
-from .agents.optimizer import Optimizer
-from .agents.strategy import StrategyGenerator
-from .execution.dispatch import Dispatcher
-from .negotiation.cda import CDAMarket
+from .runtime import runtime
 from .state import EnergyState, Strategy, WorkflowState
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Singleton agent instances
-# ---------------------------------------------------------------------------
-_strategy_gen = StrategyGenerator()
-_optimizer = Optimizer()
-_market = CDAMarket(min_candidates=2)
-_critic = MetaCritic()
-_dispatcher = Dispatcher()
-_broker = build_local_broker(_strategy_gen, _optimizer, _critic, _dispatcher)
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +47,8 @@ def _strategy_info(s) -> dict:
 def node_generate(state: WorkflowState) -> dict:
     t0 = time.perf_counter()
     energy = state["energy_state"]
-    a2a_result = _broker.send_task(
+    services = state["services"]
+    a2a_result = services["broker"].send_task(
         agent="strategy-generator",
         skill="generate_strategies",
         input={"energy_state": energy.model_dump()},
@@ -90,8 +76,9 @@ def node_generate(state: WorkflowState) -> dict:
 def node_optimize(state: WorkflowState) -> dict:
     t0 = time.perf_counter()
     energy = state["energy_state"]
+    services = state["services"]
     original_bids = [s.bid for s in state["strategies"]]
-    a2a_result = _broker.send_task(
+    a2a_result = services["broker"].send_task(
         agent="optimizer",
         skill="optimize_strategies",
         input={
@@ -120,7 +107,7 @@ def node_optimize(state: WorkflowState) -> dict:
             "status": "done",
             "duration_ms": ms,
             "summary": f"avg improvement {avg_imp:+.1f}%  best {best_imp:+.1f}%",
-            "detail": f"{_optimizer.iterations} iterations per strategy",
+            "detail": f"{services['optimizer'].iterations} iterations per strategy",
             "strategies": [_strategy_info(s) for s in optimized],
         }],
     }
@@ -128,8 +115,9 @@ def node_optimize(state: WorkflowState) -> dict:
 
 def node_auction(state: WorkflowState) -> dict:
     t0 = time.perf_counter()
-    winners = _market.auction(state["optimized"])
-    last = _market.history[-1]
+    services = state["services"]
+    winners = services["market"].auction(state["optimized"])
+    last = services["market"].history[-1]
     ms = int((time.perf_counter() - t0) * 1000)
 
     logger.info("auction: %d/%d cleared at %.4f  %dms",
@@ -162,8 +150,9 @@ def node_auction(state: WorkflowState) -> dict:
 def node_critique(state: WorkflowState) -> dict:
     t0 = time.perf_counter()
     energy = state["energy_state"]
+    services = state["services"]
     candidates = state["optimized"]
-    a2a_result = _broker.send_task(
+    a2a_result = services["broker"].send_task(
         agent="meta-critic",
         skill="select_strategy",
         input={
@@ -176,7 +165,7 @@ def node_critique(state: WorkflowState) -> dict:
     ms = int((time.perf_counter() - t0) * 1000)
 
     decomp = selected.metadata.get("reward_decomposition", {})
-    n_filtered = len(candidates) - len(_critic._filter_policy(energy, candidates))
+    n_filtered = len(candidates) - len(services["critic"]._filter_policy(energy, candidates))
 
     logger.info("critique: %s  reward=%.4f  filtered=%d  %dms",
                 selected.metadata.get("mode"), reward, n_filtered, ms)
@@ -218,12 +207,14 @@ def node_dispatch(state: WorkflowState) -> dict:
         }
 
     energy = state["energy_state"]
-    a2a_result = _broker.send_task(
+    services = state["services"]
+    a2a_result = services["broker"].send_task(
         agent="dispatcher",
         skill="dispatch_strategy",
         input={
             "energy_state": energy.model_dump(),
             "strategy": selected.model_dump(),
+            "dry_run": True,
         },
     )
     action = a2a_result.artifacts[0].data["action"]
@@ -292,8 +283,15 @@ workflow = build_workflow()
 
 async def run_workflow(energy_state: EnergyState) -> WorkflowState:
     """Run the full agentic workflow for one decision cycle."""
+    session = runtime.new_session()
     initial: WorkflowState = {
         "energy_state": energy_state,
+        "services": {
+            "broker": session.broker,
+            "optimizer": session.optimizer,
+            "market": session.market,
+            "critic": session.critic,
+        },
         "strategies": [],
         "optimized": [],
         "selected": None,
@@ -307,4 +305,4 @@ async def run_workflow(energy_state: EnergyState) -> WorkflowState:
 
 def get_agent_cards() -> list[dict]:
     """Return registered A2A agent cards."""
-    return [card.model_dump() for card in _broker.agent_cards()]
+    return runtime.agent_cards()
