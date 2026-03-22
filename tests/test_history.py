@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 
-from aetos.db.history import _kpi_values, _reward_decomposition
+from aetos.db.history import _kpi_values, _memory_strategies, _reward_decomposition
 
 
 def test_reward_decomposition_empty() -> None:
@@ -23,3 +23,10 @@ def test_kpi_values_from_decomp() -> None:
         {"reward": 10.0},
         {"cost_saving": 1.0, "ess_profit": 2.0, "solar_roi": 3.0},
     ) == (1.0, 2.0, 3.0)
+
+
+def test_memory_strategies_marks_selected() -> None:
+    selected = SimpleNamespace(id="s1", model_dump=lambda: {"id": "s1", "bid": 2.0})
+    optimized = [SimpleNamespace(model_dump=lambda: {"id": "s1", "bid": 2.0})]
+    memories = _memory_strategies({"selected": selected, "optimized": optimized, "reward": 2.0})
+    assert memories[0][2] is True

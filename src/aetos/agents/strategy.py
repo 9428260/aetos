@@ -1,6 +1,7 @@
 """StrategyGenerator – produces a diverse set of candidate strategies."""
 
 import uuid
+from typing import Any
 
 from ..config import settings
 from ..reward import compute_reward
@@ -22,10 +23,19 @@ class StrategyGenerator(BaseAgent):
     def __init__(self) -> None:
         super().__init__("StrategyGenerator")
 
-    def act(self, state: EnergyState) -> list[Strategy]:  # type: ignore[override]
+    def act(  # type: ignore[override]
+        self,
+        state: EnergyState,
+        *,
+        similar_cases: list[dict[str, Any]] | None = None,
+    ) -> list[Strategy]:
         self.perceive(state)
         ctx = self.reason()
-        return self._generate_strategies(state, ctx)
+        strategies = self._generate_strategies(state, ctx)
+        memory_strategy = self._generate_memory_guided(state, similar_cases or [])
+        if memory_strategy is not None:
+            strategies.append(memory_strategy)
+        return strategies
 
     def _generate_strategies(self, state: EnergyState, ctx: dict) -> list[Strategy]:
         strategies: list[Strategy] = []
@@ -83,6 +93,63 @@ class StrategyGenerator(BaseAgent):
             strategies.append(s)
 
         return strategies
+
+    def _generate_memory_guided(
+        self,
+        state: EnergyState,
+        similar_cases: list[dict[str, Any]],
+    ) -> Strategy | None:
+        """Return an extra candidate replicated from the best-reward past case.
+
+        The past strategy's setpoints are clamped to the *current* state's
+        SOC headroom / margin so the candidate is always constraint-safe.
+        Returns None when no usable similar case exists.
+        """
+        if not similar_cases:
+            return None
+
+        best = max(similar_cases, key=lambda c: c.get("reward", float("-inf")))
+        past = best.get("strategy", {})
+        if not past:
+            return None
+
+        ctx = self._context
+        max_charge = min(
+            settings.ess_max_charge_kw,
+            ctx["soc_headroom"] * settings.ess_capacity_kwh,
+        )
+        max_discharge = min(
+            settings.ess_max_discharge_kw,
+            ctx["soc_margin"] * settings.ess_capacity_kwh,
+        )
+
+        past_ess = past.get("ess", {})
+        past_pv = past.get("pv", {})
+        past_load = past.get("load", {})
+        past_market = past.get("market", {})
+
+        s = self._make(
+            ess=ESSAction(
+                charge_rate=min(float(past_ess.get("charge_rate", 0.0)), max_charge),
+                discharge_rate=min(float(past_ess.get("discharge_rate", 0.0)), max_discharge),
+            ),
+            pv=PVAction(curtailment_ratio=float(past_pv.get("curtailment_ratio", 0.0))),
+            load=LoadAction(
+                shift_amount=float(past_load.get("shift_amount", 0.0)),
+                shift_intervals=int(past_load.get("shift_intervals", 0)),
+            ),
+            market=MarketBid(
+                quantity=float(past_market.get("quantity", 0.0)),
+                price=float(past_market.get("price", 0.0)),
+            ),
+            meta={
+                "mode": f"memory_guided:{best.get('mode', 'unknown')}",
+                "source_episode": best.get("episode_id"),
+                "source_score": best.get("score", 0.0),
+            },
+        )
+        s.bid = compute_reward(state, s)
+        return s
 
     @staticmethod
     def _make(

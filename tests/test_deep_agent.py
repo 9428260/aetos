@@ -46,6 +46,7 @@ def test_build_deep_agent_registers_tools_and_subagents(monkeypatch):
         "mcp_policy_check",
         "mcp_dispatch",
         "mcp_kpi",
+        "retrieve_similar_strategy_cases",
     }
     assert [subagent["name"] for subagent in captured["subagents"]] == [
         "strategy-specialist",
@@ -66,3 +67,29 @@ def test_invoke_deep_agent_normalizes_response(monkeypatch):
     reply = asyncio.run(deep_agent.invoke_deep_agent("optimize now"))
 
     assert reply == "final reply"
+
+
+def test_invoke_deep_agent_includes_memory_context(monkeypatch, sample_state):
+    seen = {}
+
+    class FakeMessage:
+        content = "ok"
+
+    class FakeAgent:
+        async def ainvoke(self, payload):
+            seen["payload"] = payload
+            return {"messages": [FakeMessage()]}
+
+    async def fake_search(**kwargs):
+        return [{"mode": "market_arbitrage", "score": 0.9, "reward": 1.2, "state_summary": {}, "strategy": {}}]
+
+    monkeypatch.setattr(deep_agent, "get_deep_agent", lambda: FakeAgent())
+    monkeypatch.setattr(deep_agent.vector_store, "search", fake_search)
+
+    message = sample_state.model_dump_json()
+    reply = asyncio.run(deep_agent.invoke_deep_agent(message))
+
+    assert reply == "ok"
+    content = seen["payload"]["messages"][0].content
+    assert "Retrieved similar strategy memories" in content
+    assert "market_arbitrage" in content

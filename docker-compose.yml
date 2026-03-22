@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_USER: aetos
@@ -29,22 +29,11 @@ services:
         condition: service_healthy
     volumes:
       - ./src:/app/src
+    # MCP SSE is mounted by the FastAPI app at /mcp.
 
   loop:
     build: .
     command: python -m aetos.loop
-    env_file: .env
-    environment:
-      DATABASE_URL: postgresql+asyncpg://aetos:aetos@db:5432/aetos
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ./src:/app/src
-
-  mcp:
-    build: .
-    command: python -m aetos.mcp.server
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://aetos:aetos@db:5432/aetos

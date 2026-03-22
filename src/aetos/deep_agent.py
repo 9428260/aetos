@@ -17,6 +17,7 @@ from langchain_core.tools import tool
 from langchain_openai import AzureChatOpenAI
 
 from .config import settings
+from .memory.vector_store import vector_store
 from .mcp.server import mcp as _mcp
 from .observability import audit_log, metrics, timed
 from .runtime import runtime
@@ -109,6 +110,10 @@ def _validate_strategy_payload(strategy: dict[str, Any]) -> Strategy:
         raise DeepAgentInputError(f"invalid strategy payload: {exc}") from exc
 
 
+def _build_memory_context(records: list[dict[str, Any]], title: str = "Similar cases") -> str:
+    return f"{title}:\n{vector_store.format_context(records)}"
+
+
 async def _call_mcp(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     """FastMCP in-process 호출 — 실제 MCP 프로토콜 dispatch를 경유합니다."""
     results = await _mcp.call_tool(tool_name, arguments)
@@ -164,14 +169,42 @@ async def mcp_kpi() -> dict:
 
 
 @tool
-def a2a_generate_strategies(energy_state: dict[str, Any]) -> dict:
-    """Generate candidate strategies through the A2A broker."""
+async def retrieve_similar_strategy_cases(
+    energy_state: dict[str, Any],
+    request_text: str = "",
+    top_k: int = 3,
+    selected_only: bool = False,
+) -> dict:
+    """Retrieve top-k similar historical strategy cases from the vector memory."""
     energy = _validate_state_payload(energy_state)
+    results = await vector_store.search(
+        state=energy,
+        request_text=request_text,
+        top_k=top_k,
+        selected_only=selected_only,
+    )
+    return {"matches": results, "context": vector_store.format_context(results)}
+
+
+@tool
+async def a2a_generate_strategies(energy_state: dict[str, Any]) -> dict:
+    """Generate candidate strategies through the A2A broker.
+
+    Retrieves top-k similar past cases from vector memory first and passes
+    them as context so the StrategyGenerator can produce a memory-guided
+    candidate in addition to the standard six modes.
+    """
+    energy = _validate_state_payload(energy_state)
+    similar_cases = await vector_store.search(
+        state=energy,
+        top_k=settings.vector_memory_top_k,
+        selected_only=False,
+    )
     session = runtime.new_session()
     result = session.broker.send_task(
         agent="strategy-generator",
         skill="generate_strategies",
-        input={"energy_state": energy.model_dump()},
+        input={"energy_state": energy.model_dump(), "similar_cases": similar_cases},
     )
     return result.artifacts[0].data
 
@@ -194,18 +227,32 @@ def a2a_optimize_strategies(
 
 
 @tool
-def a2a_select_strategy(
+async def a2a_select_strategy(
     energy_state: dict[str, Any],
     candidates: list[dict[str, Any]],
 ) -> dict:
-    """Select the best strategy through the A2A broker."""
+    """Select the best strategy through the A2A broker.
+
+    Retrieves top-k *selected* past cases (winning strategies) from vector
+    memory and injects them so MetaCritic can incorporate historical mode
+    performance into its scoring.
+    """
     energy = _validate_state_payload(energy_state)
     validated = [_validate_strategy_payload(s).model_dump() for s in candidates]
+    similar_cases = await vector_store.search(
+        state=energy,
+        top_k=settings.vector_memory_top_k,
+        selected_only=True,
+    )
     session = runtime.new_session()
     result = session.broker.send_task(
         agent="meta-critic",
         skill="select_strategy",
-        input={"energy_state": energy.model_dump(), "candidates": validated},
+        input={
+            "energy_state": energy.model_dump(),
+            "candidates": validated,
+            "similar_cases": similar_cases,
+        },
     )
     return result.artifacts[0].data
 
@@ -235,6 +282,7 @@ def get_deep_agent_tools() -> Sequence[Any]:
         mcp_policy_check,
         mcp_dispatch,
         mcp_kpi,
+        retrieve_similar_strategy_cases,
     ]
 
 
@@ -245,22 +293,26 @@ def get_deep_agent_subagents() -> list[SubAgent]:
             "description": "Generate and refine candidate strategies through A2A agents.",
             "system_prompt": (
                 "Handle strategy generation requests.\n"
+                "Always call retrieve_similar_strategy_cases first with the current EnergyState and task text.\n"
                 "Use a2a_generate_strategies to create candidates.\n"
                 "Use a2a_optimize_strategies when refinement is required.\n"
+                "Inject the retrieved similar cases into your reasoning before generating candidates.\n"
                 "Return concise summaries with counts, dominant modes, and notable bid changes."
             ),
-            "tools": [a2a_generate_strategies, a2a_optimize_strategies],
+            "tools": [retrieve_similar_strategy_cases, a2a_generate_strategies, a2a_optimize_strategies],
         },
         {
             "name": "selection-specialist",
             "description": "Validate or choose the best strategy using A2A and MCP checks.",
             "system_prompt": (
                 "Handle final strategy selection and dispatch preparation.\n"
+                "Always call retrieve_similar_strategy_cases first with selected_only=true before choosing.\n"
                 "Use a2a_select_strategy to pick a candidate.\n"
                 "Use mcp_policy_check when constraint validation is required.\n"
+                "Inject the retrieved similar cases into your reasoning before selection.\n"
                 "Use a2a_dispatch_strategy only when explicitly asked to dispatch."
             ),
-            "tools": [a2a_select_strategy, a2a_dispatch_strategy, mcp_policy_check],
+            "tools": [retrieve_similar_strategy_cases, a2a_select_strategy, a2a_dispatch_strategy, mcp_policy_check],
         },
     ]
 
@@ -294,8 +346,11 @@ def build_deep_agent():
         subagents=get_deep_agent_subagents(),
         system_prompt=(
             "You are the AETOS orchestration agent.\n"
+            "When a user request includes an EnergyState, similar past strategy memories are injected at the top of"
+            " the prompt — read them before deciding which tools or subagents to invoke.\n"
             "Use MCP tools for forecasting, optimization, policy checks, dispatch, and KPI lookup.\n"
-            "Delegate specialized candidate generation or selection work to the A2A subagents when the task is multi-step.\n"
+            "Delegate specialized candidate generation or selection work to the A2A subagents when the task is"
+            " multi-step; those subagents also have access to vector memory via retrieve_similar_strategy_cases.\n"
             "If the user provides EnergyState JSON, preserve it exactly.\n"
             "Never invent dispatch results or KPI values; call tools.\n"
             "If required data is missing, say so explicitly instead of guessing."
@@ -352,8 +407,16 @@ async def invoke_deep_agent(message: str) -> str:
 
     prompt = cleaned
     if payload is not None:
+        memory_hits = await vector_store.search(
+            state=EnergyState.model_validate(payload),
+            request_text=cleaned,
+            top_k=settings.vector_memory_top_k,
+            selected_only=False,
+        )
         prompt = (
-            "User request with validated EnergyState JSON:\n"
+            "User request with validated EnergyState JSON.\n"
+            f"{_build_memory_context(memory_hits, 'Retrieved similar strategy memories')}\n\n"
+            "EnergyState JSON:\n"
             f"{json.dumps(payload, ensure_ascii=True)}"
         )
 

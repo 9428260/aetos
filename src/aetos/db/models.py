@@ -2,13 +2,17 @@
 
 - ``episodes`` — one row per decision cycle (state, action, reward, full workflow trace)
 - ``kpi`` — KPI snapshot per episode, linked via ``episode_id``
+- ``strategy_memory`` — vectorized strategy/state memories for retrieval (pgvector)
 """
 
 from datetime import datetime, timezone
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, Float, ForeignKey, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+from ..config import settings
 
 
 class Base(DeclarativeBase):
@@ -77,3 +81,39 @@ class KPI(Base):
             f"cost_saving={self.cost_saving:.2f} "
             f"ess_profit={self.ess_profit:.2f}>"
         )
+
+
+class StrategyMemory(Base):
+    """Vectorized memory entries for strategy retrieval."""
+
+    __tablename__ = "strategy_memory"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, index=True
+    )
+    episode_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("episodes.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    strategy_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    mode: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    source: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default=text("'api'"), index=True
+    )
+    selected: Mapped[bool] = mapped_column(nullable=False, default=False)
+    reward: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    state_summary: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    strategy: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    reward_decomposition: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    embedding_schema: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    embedding: Mapped[list] = mapped_column(
+        Vector(settings.vector_embedding_dim), nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<StrategyMemory id={self.id[:8]} mode={self.mode} reward={self.reward:.4f}>"

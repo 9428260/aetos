@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     azure_openai_api_version: str = ""
     azure_openai_embedding_deployment: str = ""
     openai_embedding_model: str = ""
+    # pgvector – must match the embedding model's output dimension.
+    # 1536 for text-embedding-ada-002 / text-embedding-3-small (Azure OpenAI default).
+    # Set to 22 when no embedding model is configured (state + text fallback).
+    vector_embedding_dim: int = 1536
 
     # Weather integration
     openweather_api_key: str = ""
@@ -54,6 +58,8 @@ class Settings(BaseSettings):
     deep_agent_max_concurrency: int = 4
     deep_agent_requests_per_minute: int = 30
     deep_agent_fallback_mode: str = "workflow"
+    vector_memory_top_k: int = 5
+    vector_memory_candidate_limit: int = 200
 
 
 settings = Settings()

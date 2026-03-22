@@ -47,7 +47,8 @@ class StrategyGeneratorA2A:
         if task.skill != "generate_strategies":
             raise A2AProtocolError(f"unsupported skill '{task.skill}'")
         energy = EnergyState.model_validate(task.input["energy_state"])
-        strategies = self._agent.act(energy)
+        similar_cases: list[dict] = task.input.get("similar_cases", [])
+        strategies = self._agent.act(energy, similar_cases=similar_cases)
         return _result(
             task,
             artifact_name="strategies",
@@ -95,7 +96,8 @@ class CriticA2A:
             raise A2AProtocolError(f"unsupported skill '{task.skill}'")
         energy = EnergyState.model_validate(task.input["energy_state"])
         candidates = [Strategy.model_validate(s) for s in task.input["candidates"]]
-        selected = self._agent.act(energy, candidates)
+        similar_cases: list[dict] = task.input.get("similar_cases", [])
+        selected = self._agent.act(energy, candidates, similar_cases=similar_cases)
         reward = compute_reward(energy, selected)
         return _result(
             task,

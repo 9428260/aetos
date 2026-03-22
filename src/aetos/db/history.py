@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Literal
 
+from ..memory.vector_store import vector_store
 from ..state import EnergyState
 from .models import Episode, KPI
 
@@ -32,6 +33,36 @@ def _kpi_values(result: dict, decomp: dict) -> tuple[float, float, float]:
         float(decomp.get("ess_profit", reward * 0.3)),
         float(decomp.get("solar_roi", reward * 0.2)),
     )
+
+
+def _memory_strategies(result: dict) -> list[tuple[dict, float, bool]]:
+    selected = result.get("selected")
+    selected_id = getattr(selected, "id", None)
+
+    candidates = result.get("optimized") or []
+    if not candidates:
+        for ev in result.get("step_events") or []:
+            if ev.get("node") == "optimize" and ev.get("strategies"):
+                candidates = ev["strategies"]
+                break
+
+    memories: list[tuple[dict, float, bool]] = []
+    seen: set[str] = set()
+
+    for item in candidates or []:
+        if not item:
+            continue
+        strategy = item.model_dump() if hasattr(item, "model_dump") else dict(item)
+        strategy_id = strategy.get("id")
+        if not strategy_id or strategy_id in seen:
+            continue
+        seen.add(strategy_id)
+        memories.append((strategy, float(strategy.get("bid", 0.0)), strategy_id == selected_id))
+
+    if selected and selected_id not in seen:
+        strategy = selected.model_dump()
+        memories.append((strategy, float(result.get("reward", strategy.get("bid", 0.0))), True))
+    return memories
 
 
 async def persist_workflow_run(
@@ -94,6 +125,19 @@ async def persist_workflow_run(
     try:
         async with AsyncSessionLocal() as s:
             await _commit(s)
+        for strategy_dict, strategy_reward, selected_flag in _memory_strategies(result):
+            from ..state import Strategy
+
+            strategy_obj = Strategy.model_validate(strategy_dict)
+            await vector_store.add_memory(
+                episode_id=episode_id,
+                source=source,
+                state=state,
+                strategy=strategy_obj,
+                reward=strategy_reward,
+                selected=selected_flag,
+                reward_decomposition=decomp,
+            )
         return episode_id
     except Exception as e:
         logger.debug("DB persist skipped: %s", e)
